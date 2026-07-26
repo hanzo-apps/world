@@ -24,10 +24,10 @@ import (
 // "miss" for this long instead of re-dialing on every request.
 const breakerCooldown = 15 * time.Second
 
-// Client wraps a go-redis client. A zero/disabled Client (r == nil) is valid and
+// Client wraps a hanzokv client. A zero/disabled Client (r == nil) is valid and
 // behaves as a permanent clean miss, so local dev and CI need no Redis.
 type Client struct {
-	r         *redis.Client
+	r         *kv.Client
 	downUntil atomic.Int64 // unix-nano; server parked until then
 }
 
@@ -39,7 +39,7 @@ func Open(addr, password string) *Client {
 	if addr == "" {
 		return &Client{}
 	}
-	return &Client{r: redis.NewClient(&redis.Options{
+	return &Client{r: kv.NewClient(&kv.Options{
 		Addr:         addr,
 		Password:     password,
 		DialTimeout:  2 * time.Second,
@@ -65,13 +65,13 @@ func (c *Client) available() bool {
 func (c *Client) trip() { c.downUntil.Store(time.Now().Add(breakerCooldown).UnixNano()) }
 
 // GetBytes returns the value for key, or (nil,false) on miss/failure. A real
-// cache miss (redis.Nil) does not trip the breaker; a transport error does.
+// cache miss (kv.Nil) does not trip the breaker; a transport error does.
 func (c *Client) GetBytes(ctx context.Context, key string) ([]byte, bool) {
 	if !c.available() {
 		return nil, false
 	}
 	b, err := c.r.Get(ctx, key).Bytes()
-	if err == redis.Nil {
+	if err == kv.Nil {
 		return nil, false
 	}
 	if err != nil {
@@ -123,7 +123,7 @@ func (c *Client) SMembers(ctx context.Context, key string) []string {
 // when disabled or unreachable.
 func (c *Client) Ping(ctx context.Context) error {
 	if c == nil || c.r == nil {
-		return redis.ErrClosed
+		return kv.ErrClosed
 	}
 	return c.r.Ping(ctx).Err()
 }
