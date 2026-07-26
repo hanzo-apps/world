@@ -17,7 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/redis/go-redis/v9"
+	"github.com/hanzokv/go/v9"
 )
 
 // breakerCooldown parks a failing server: after an error, ops short-circuit to
