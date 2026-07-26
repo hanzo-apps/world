@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/alicebob/miniredis/v2 v2.38.0
 	github.com/hanzoai/sqlite v0.3.2
-	github.com/hanzokv/go/v9 v9.21.1
+	github.com/hanzokv/go/v9 v9.22.0
 	golang.org/x/net v0.54.0
 )
 
