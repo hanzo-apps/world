@@ -18,7 +18,6 @@
     "noUncheckedIndexedAccess": true,
     "resolveJsonModule": true,
     "esModuleInterop": true,
-    "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
     }
