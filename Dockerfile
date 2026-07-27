@@ -35,7 +35,10 @@ WORKDIR /app
 # `pnpm install --frozen-lockfile`, and this repo ships a pnpm lockfile —
 # there is no package-lock.json, so the COPY failed with
 #   failed to calculate checksum of ref ...: "/package-lock.json": not found
-COPY package.json pnpm-lock.yaml ./
+# pnpm-workspace.yaml is REQUIRED here, not optional: pnpm 11 reads
+# onlyBuiltDependencies from it, and without the file the install fails on
+# ERR_PNPM_IGNORED_BUILDS even though the setting is committed.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN corepack enable && pnpm install --frozen-lockfile
 COPY . .
 # vite.config.ts: default base '/', default outDir 'dist'. VITE_VARIANT defaults
