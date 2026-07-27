@@ -39,7 +39,7 @@ func serviceAuth() map[string]string {
 	return map[string]string{"Authorization": "Bearer " + tok}
 }
 
-// ── platform usage ledger (ai GET /v1/ops/usages/cloud) ──────────────────────
+// ── platform usage ledger (ai GET /v1/ai/usages/cloud) ──────────────────────
 
 // cloudUsageOverview decodes the fields world aggregates from ai's
 // object.CloudUsageOverview. The upstream is ClickHouse-backed; ?org=all is the
@@ -89,7 +89,7 @@ func (s *Server) fetchCloudUsage(ctx context.Context, rangeLabel string, hdr map
 		return nil, errNoServiceToken
 	}
 	var ov cloudUsageOverview
-	url := apiHost() + "/v1/ops/usages/cloud?org=all&range=" + rangeLabel
+	url := apiHost() + "/v1/ai/usages/cloud?org=all&range=" + rangeLabel
 	if err := s.getJSON(ctx, url, hdr, &ov); err != nil {
 		return nil, err
 	}
