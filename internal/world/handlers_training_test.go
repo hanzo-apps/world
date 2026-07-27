@@ -51,10 +51,7 @@ func TestTrainingContributionProxy(t *testing.T) {
 	t.Setenv("HANZO_API_BASE", upstream.URL)
 
 	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
+	ts := serveLive(t, s)
 
 	do := func(method, path, bearer, org, body string) *http.Response {
 		var r io.Reader

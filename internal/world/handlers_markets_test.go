@@ -3,7 +3,6 @@ package world
 import (
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"testing"
 )
@@ -17,9 +16,9 @@ func TestValidateYahooSymbols(t *testing.T) {
 	}{
 		{"", nil},
 		{"spy", []string{"SPY"}},
-		{"SPY,spy,Spy", []string{"SPY"}},                       // dedup, case-insensitive
+		{"SPY,spy,Spy", []string{"SPY"}}, // dedup, case-insensitive
 		{"EURUSD=X,GC=F,^GSPC", []string{"EURUSD=X", "GC=F", "^GSPC"}}, // FX / futures / index chars
-		{"SPY,bad!sym,,DX-Y.NYB", []string{"SPY", "DX-Y.NYB"}}, // drop invalid + empty
+		{"SPY,bad!sym,,DX-Y.NYB", []string{"SPY", "DX-Y.NYB"}},         // drop invalid + empty
 	}
 	for _, c := range cases {
 		if got := validateYahooSymbols(c.in); !reflect.DeepEqual(got, c.want) {
@@ -44,10 +43,7 @@ func TestValidateYahooSymbols(t *testing.T) {
 // a flaky Yahoo (e.g. a 429) degrades to quiet unavailable rows, not a broken panel.
 func TestYahooBatchNever5xxShape(t *testing.T) {
 	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
+	ts := serveLive(t, s)
 
 	// missing param → clean 4xx, never 5xx / crash
 	resp, err := http.Get(ts.URL + "/v1/world/yahoo-batch")

@@ -238,9 +238,7 @@ func TestAnalystDataToolLoop(t *testing.T) {
 
 	s := NewServer()
 	s.ai.base = ai.URL
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
+	ts := serveLive(t, s)
 	defer ts.Close()
 
 	reqBody, _ := json.Marshal(map[string]any{
@@ -324,7 +322,7 @@ func writeChatMessage(w http.ResponseWriter, message map[string]any) {
 
 // postAnalyst drives the non-streaming analyst path with a signed-in bearer and
 // returns the decoded response envelope.
-func postAnalyst(t *testing.T, ts *httptest.Server, prompt string) map[string]any {
+func postAnalyst(t *testing.T, ts *liveServer, prompt string) map[string]any {
 	t.Helper()
 	reqBody, _ := json.Marshal(map[string]any{
 		"messages": []map[string]string{{"role": "user", "content": prompt}},
@@ -362,9 +360,7 @@ func TestAnalystRecoversReasoningWhenNoContent(t *testing.T) {
 
 	s := NewServer()
 	s.ai.base = ai.URL
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
+	ts := serveLive(t, s)
 	defer ts.Close()
 
 	out := postAnalyst(t, ts, "Reply with strict JSON only")
@@ -388,9 +384,7 @@ func TestAnalystEmptyAnswerNamesModel(t *testing.T) {
 
 	s := NewServer() // default model "best"
 	s.ai.base = ai.URL
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
+	ts := serveLive(t, s)
 	defer ts.Close()
 
 	out := postAnalyst(t, ts, "hi")
@@ -492,9 +486,7 @@ func TestExtractAgentText(t *testing.T) {
 
 func TestHandleModelsCuratedRoster(t *testing.T) {
 	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
+	ts := serveLive(t, s)
 	defer ts.Close()
 
 	// No bearer → curated Zen roster only, never a 5xx.
@@ -556,9 +548,7 @@ func TestHandleModelsCuratedRoster(t *testing.T) {
 func TestAnalystChatRequiresUserBearer(t *testing.T) {
 	s := NewServer()
 	s.ai.key = "hk-test-funded" // funded key present (backs anonymous auto-insights only)
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
+	ts := serveLive(t, s)
 	defer ts.Close()
 
 	body := `{"messages":[{"role":"user","content":"hi"}],"context":""}`

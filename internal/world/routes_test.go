@@ -2,7 +2,6 @@ package world
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -14,9 +13,7 @@ import (
 // smoke suite for the data plane; run: go test ./internal/world/
 func TestRoutesRespond(t *testing.T) {
 	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
+	ts := serveLive(t, s)
 	t.Cleanup(ts.Close) // after ALL parallel subtests (defer would fire too early)
 
 	// route → optional query that makes it a real request

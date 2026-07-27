@@ -230,10 +230,10 @@ func (s *Server) dispatchTool(ctx context.Context, name string, args map[string]
 	if reqBody != nil {
 		rdr = bytes.NewReader(reqBody)
 	}
-	hr, herr := http.NewRequestWithContext(ctx, t.Method, path, rdr)
-	if herr != nil {
-		return []byte(herr.Error()), true, nil
-	}
+	// httptest.NewRequest, not http.NewRequest: the dispatcher is an http.Handler,
+	// so it must be handed a SERVER-shaped request. A client-shaped one leaves
+	// RequestURI empty, which any router reading that field resolves to nothing.
+	hr := httptest.NewRequest(t.Method, path, rdr).WithContext(ctx)
 	if reqBody != nil {
 		hr.Header.Set("Content-Type", "application/json")
 	}

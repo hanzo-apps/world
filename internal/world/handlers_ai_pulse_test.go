@@ -38,14 +38,9 @@ func aiPulseUpstream(t *testing.T) *httptest.Server {
 	return up
 }
 
-func aiPulseServer(t *testing.T) *httptest.Server {
+func aiPulseServer(t *testing.T) *liveServer {
 	t.Helper()
-	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
-	return ts
+	return serveLive(t, NewServer())
 }
 
 // TestAIPulseUnavailableWithoutToken: the honest degrade — no token, so the JSON
@@ -180,10 +175,7 @@ func TestAIPulseAdminPoll(t *testing.T) {
 	t.Setenv("WORLD_ADMIN_ORGS", "hanzo") // operator org resolves via deploy env, not code
 
 	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
+	ts := serveLive(t, s)
 
 	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/v1/world/ai-pulse", nil)
 	req.Header.Set("Authorization", "Bearer admin-token")

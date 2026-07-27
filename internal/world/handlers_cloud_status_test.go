@@ -3,7 +3,6 @@ package world
 import (
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 )
 
@@ -12,10 +11,7 @@ import (
 // honest available flag (false when the page is unreachable) — never a 5xx.
 func TestStatusPageNeverErrors(t *testing.T) {
 	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
+	ts := serveLive(t, s)
 
 	resp, err := http.Get(ts.URL + "/v1/world/cloud/status-page")
 	if err != nil {

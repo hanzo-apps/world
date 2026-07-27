@@ -14,10 +14,7 @@ import (
 // heights; the luxfi/node L1s (lux/zoo/hanzo) may be live:false in CI.
 func TestChainNodesCatalog(t *testing.T) {
 	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
+	ts := serveLive(t, s)
 
 	resp, err := http.Get(ts.URL + "/v1/world/cloud/chain-nodes")
 	if err != nil {
