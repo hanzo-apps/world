@@ -48,7 +48,7 @@ func (s *Server) handleTrainingContribution(w http.ResponseWriter, r *http.Reque
 	var status int
 	var err error
 	if r.Method == http.MethodGet {
-		upstream, status, err = s.get(ctx, base+"/v1/get-training-contribution", hdr)
+		upstream, status, err = s.get(ctx, base+"/v1/ai/training-contribution", hdr)
 	} else {
 		raw, rerr := io.ReadAll(http.MaxBytesReader(w, r.Body, 4<<10))
 		if rerr != nil {
@@ -56,7 +56,7 @@ func (s *Server) handleTrainingContribution(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		hdr["Content-Type"] = "application/json"
-		upstream, status, err = s.do(ctx, http.MethodPost, base+"/v1/update-training-contribution", hdr, raw)
+		upstream, status, err = s.do(ctx, http.MethodPatch, base+"/v1/ai/training-contribution", hdr, raw)
 	}
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "Consent service unavailable")

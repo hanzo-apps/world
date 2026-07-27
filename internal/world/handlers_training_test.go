@@ -11,23 +11,28 @@ import (
 
 // TestTrainingContributionProxy verifies the model-improvement consent proxy:
 //   - signed out (no bearer) → 401 (the toggle's hidden state) with NO upstream call,
-//   - GET forwards the caller's bearer + X-Org-Id to ai /v1/get-training-contribution
+//   - GET forwards the caller's bearer + X-Org-Id to ai GET /v1/ai/training-contribution
 //     and UNWRAPS the casibase envelope {status,data:{enabled}} to a bare {enabled},
-//   - POST forwards the {enabled} body to ai /v1/update-training-contribution and
+//   - POST forwards the {enabled} body to ai PATCH /v1/ai/training-contribution and
 //     unwraps the resolved state.
 func TestTrainingContributionProxy(t *testing.T) {
-	var gotAuth, gotOrg, gotPath, gotBody string
+	var gotAuth, gotOrg, gotPath, gotMethod, gotBody string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth = r.Header.Get("Authorization")
 		gotOrg = r.Header.Get("X-Org-Id")
 		gotPath = r.URL.Path
+		gotMethod = r.Method
 		b, _ := io.ReadAll(r.Body)
 		gotBody = string(b)
 		w.Header().Set("Content-Type", "application/json")
-		switch r.URL.Path {
-		case "/v1/get-training-contribution":
+		if r.URL.Path != "/v1/ai/training-contribution" {
+			http.NotFound(w, r)
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
 			_, _ = io.WriteString(w, `{"status":"ok","msg":"","data":{"enabled":true},"data2":null}`)
-		case "/v1/update-training-contribution":
+		case http.MethodPatch:
 			// Echo the requested state, as the real controller does.
 			var body struct {
 				Enabled bool `json:"enabled"`
@@ -99,8 +104,8 @@ func TestTrainingContributionProxy(t *testing.T) {
 	if gotOrg != "maxpower" {
 		t.Errorf("forwarded X-Org-Id = %q, want maxpower", gotOrg)
 	}
-	if gotPath != "/v1/get-training-contribution" {
-		t.Errorf("GET hit %q, want /v1/get-training-contribution", gotPath)
+	if gotMethod != http.MethodGet || gotPath != "/v1/ai/training-contribution" {
+		t.Errorf("GET hit %s %q, want GET /v1/ai/training-contribution", gotMethod, gotPath)
 	}
 
 	// 3) POST forwards the body and unwraps the resolved opt-in state.
@@ -115,8 +120,8 @@ func TestTrainingContributionProxy(t *testing.T) {
 	if !p.Enabled {
 		t.Errorf("POST enabled = false, want true")
 	}
-	if gotPath != "/v1/update-training-contribution" {
-		t.Errorf("POST hit %q, want /v1/update-training-contribution", gotPath)
+	if gotMethod != http.MethodPatch || gotPath != "/v1/ai/training-contribution" {
+		t.Errorf("POST hit %s %q, want PATCH /v1/ai/training-contribution", gotMethod, gotPath)
 	}
 	if !strings.Contains(gotBody, `"enabled":true`) {
 		t.Errorf("forwarded body = %q, want the {enabled:true} opt-in", gotBody)
