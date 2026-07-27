@@ -9,9 +9,3 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - '@hanzo/*'
   - '@hanzogui/*'
-
-# @vaadin/vaadin-usage-statistics phones home. It arrives transitively via
-# @arcgis/core -> @vaadin/grid -> @vaadin/component-base, so it cannot simply be
-# removed from package.json; this replaces it with an empty package.
-overrides:
-  '@vaadin/vaadin-usage-statistics': npm:empty-npm-package@1.0.0
