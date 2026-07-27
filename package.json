@@ -75,7 +75,7 @@
     "@deck.gl/mapbox": "^9.3.7",
     "@hanzo/ai": "^0.2.2",
     "@hanzo/brand": "^1.4.1",
-    "@hanzo/event": "^0.3.1",
+    "@hanzo/event": "^0.3.3",
     "@hanzo/gui": "^7.3.0",
     "@hanzogui/config": "^7.3.0",
     "@hanzogui/shell": "^7.6.1",
