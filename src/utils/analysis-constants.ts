@@ -36,6 +36,9 @@ export const FLOW_DROP_KEYWORDS = [
   'reduction', 'drop', 'offline', 'suspend', 'suspended', 'stoppage',
 ];
 
+// Default SEED for topic-velocity tracking. It is not the topic universe: the
+// signed-in user's own topics (their Monitor keywords) are unioned in by
+// analyzeCorrelationsCore's `topics` argument.
 export const TOPIC_KEYWORDS = [
   'iran', 'israel', 'ukraine', 'russia', 'china', 'taiwan', 'oil', 'crypto',
   'fed', 'interest', 'inflation', 'recession', 'war', 'sanctions', 'tariff',

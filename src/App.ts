@@ -3,6 +3,7 @@ import type { NewsItem, Monitor, PanelConfig, MapLayers, RelatedAsset, InternetO
 import {
   FEEDS,
   feedsFor,
+  topicFeeds,
   ALL_FEED_KEYS,
   INTEL_SOURCES,
   SECTORS,
@@ -4556,10 +4557,18 @@ export class App {
     // Signed in, the Go backend matches against the whole lake — every item it
     // ingested, not just the headlines this tab loaded. Signed out (or server
     // unreachable), match locally exactly as before.
-    void fetchMonitorMatches().then((matches) => {
-      if (matches) monitorPanel.renderServerMatches(matches);
-      else monitorPanel.renderResults(this.allNews);
-    });
+    const render = (extra: NewsItem[] = []) => {
+      void fetchMonitorMatches().then((matches) => {
+        if (matches) monitorPanel.renderServerMatches(matches);
+        else monitorPanel.renderResults([...extra, ...this.allNews]);
+      });
+    };
+    render();
+    // Then pull the user's own topics through the same feed path every panel
+    // uses, which also folds them into the server-side lake — so a topic nobody
+    // curated a source for still finds content, on this device and the next.
+    const feeds = topicFeeds(this.monitors);
+    if (feeds.length > 0) void fetchCategoryFeeds(feeds).then(render);
   }
 
   // Adopt the signed-in user's server-side monitors once identity resolves, so a
@@ -4590,7 +4599,8 @@ export class App {
       const signals = await analysisWorker.analyzeCorrelations(
         this.latestClusters,
         this.latestPredictions,
-        this.latestMarkets
+        this.latestMarkets,
+        this.monitors.flatMap((m) => m.keywords) // the user's own topics, not just the seed
       );
 
       // Detect geographic convergence (suppress during learning mode)

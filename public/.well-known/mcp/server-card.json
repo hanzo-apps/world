@@ -156,7 +156,8 @@
               "tech",
               "markets",
               "security",
-              "ai"
+              "ai",
+              "social"
             ],
             "type": "string"
           }

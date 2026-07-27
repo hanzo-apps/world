@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { YStack, XStack, SizableText, Input, Button } from '@hanzo/gui';
 import { loadMonitors, saveMonitors, fetchMonitorMatches, type MonitorMatch } from '@/services/monitors';
-import { MONITOR_COLORS, STORAGE_KEYS } from '@/config';
+import { MONITOR_COLORS, STORAGE_KEYS, topicFeeds } from '@/config';
+import { fetchCategoryFeeds } from '@/services/rss';
 import { generateId, getCSSColor, formatTime, loadFromStorage } from '@/utils';
 import { sanitizeUrl } from '@/utils/sanitize';
 import { t } from '@/services/i18n';
@@ -89,8 +90,9 @@ export function MonitorPanel({ slot }: { slot: PanelSlot }): React.JSX.Element {
   const [state, setState] = useState<PanelState>('ready');
 
   // The React news store is not wired yet (App's getAllNews → []); the local
-  // matcher activates unchanged once it lands.
-  const news: NewsItem[] = [];
+  // matcher activates unchanged once it lands. What IS available is the user's
+  // own topics — pulled below through the same feed path every panel uses.
+  const [news, setNews] = useState<NewsItem[]>([]);
 
   // Adopt the signed-in user's server-side monitors once identity resolves, so a
   // second device shows the monitors made on the first (vanilla syncMonitorsFromServer).
@@ -111,10 +113,16 @@ export function MonitorPanel({ slot }: { slot: PanelSlot }): React.JSX.Element {
 
   // Recompute results whenever the monitor list changes: the Go backend matches the
   // whole lake when signed in, else we fall back to the local matcher (vanilla
-  // updateMonitorResults).
+  // updateMonitorResults). Pulling the per-topic feeds first also folds them into
+  // the server-side lake, so a brand-new topic finds content either way.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      const feeds = topicFeeds(monitors);
+      if (feeds.length > 0) {
+        const items = await fetchCategoryFeeds(feeds).catch(() => []);
+        if (!cancelled) setNews(items);
+      }
       try {
         const matches = await fetchMonitorMatches();
         if (!cancelled) setServerMatches(matches);

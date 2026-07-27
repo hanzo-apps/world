@@ -33,6 +33,7 @@ interface CorrelationMessage {
   predictions: PredictionMarketCore[];
   markets: MarketDataCore[];
   sourceTypes: Record<string, SourceType>;
+  topics: string[]; // the user's own watched topics, unioned into the seed
 }
 
 interface ResetMessage {
@@ -111,7 +112,8 @@ self.onmessage = (event: MessageEvent<WorkerMessage>) => {
         previousSnapshot,
         getSourceType,
         isRecentDuplicate,
-        markSignalSeen
+        markSignalSeen,
+        message.topics
       );
 
       previousSnapshot = snapshot;

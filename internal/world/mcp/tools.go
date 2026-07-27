@@ -272,10 +272,18 @@ var feedCategories = map[string][]string{
 		"https://www.technologyreview.com/feed/",
 		"https://venturebeat.com/category/ai/feed/",
 	},
+	// Only the keyless half of the social set: X/TikTok/LinkedIn are same-origin
+	// emitters (/v1/world/social/*), not URLs the batch fetcher can take.
+	"social": {
+		"https://www.reddit.com/r/worldnews/.rss",
+		"https://www.reddit.com/r/technology/.rss",
+		"https://www.reddit.com/r/investing/.rss",
+		"https://www.youtube.com/feeds/videos.xml?channel_id=UChqUTb7kYRX8-EiaN3XFrSQ",
+	},
 }
 
 // feedCategoryNames is the ordered enum for the feeds tool schema (deterministic).
-var feedCategoryNames = []string{"world", "tech", "markets", "security", "ai"}
+var feedCategoryNames = []string{"world", "tech", "markets", "security", "ai", "social"}
 
 // FeedCategories returns a copy of the curated category→feed-URL map so
 // same-binary callers (the AI-plane /v1/world/{news,feeds} handlers) read the

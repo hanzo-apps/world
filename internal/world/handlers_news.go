@@ -577,8 +577,7 @@ func (s *Server) handleFwdstart(w http.ResponseWriter, r *http.Request) {
 }
 
 func buildFwdstartRSS(html string) []byte {
-	type item struct{ url, title, date string }
-	var items []item
+	var items []rssOutItem
 	seen := map[string]bool{}
 	for _, block := range strings.Split(html, "embla__slide")[1:] {
 		lm := fwdLinkRe.FindStringSubmatch(block)
@@ -600,29 +599,13 @@ func buildFwdstartRSS(html string) []byte {
 			}
 		}
 		seen[link] = true
-		items = append(items, item{link, trimSpace(am[1]), date})
+		items = append(items, rssOutItem{trimSpace(am[1]), link, date})
 		if len(items) >= 30 {
 			break
 		}
 	}
-	var b strings.Builder
-	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n")
-	b.WriteString(`<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel>`)
-	b.WriteString(`<title>FwdStart Newsletter</title>`)
-	b.WriteString(`<link>https://www.fwdstart.me</link>`)
-	b.WriteString(`<description>FwdStart newsletter archive</description>`)
-	b.WriteString(`<atom:link href="https://world.hanzo.ai/v1/world/fwdstart" rel="self" type="application/rss+xml"/>`)
-	for _, it := range items {
-		b.WriteString(`<item>`)
-		b.WriteString(`<title><![CDATA[` + it.title + `]]></title>`)
-		b.WriteString(`<link>` + it.url + `</link>`)
-		b.WriteString(`<guid>` + it.url + `</guid>`)
-		b.WriteString(`<pubDate>` + it.date + `</pubDate>`)
-		b.WriteString(`<source url="https://www.fwdstart.me">FwdStart</source>`)
-		b.WriteString(`</item>`)
-	}
-	b.WriteString(`</channel></rss>`)
-	return []byte(b.String())
+	return buildRSS("FwdStart Newsletter", "https://www.fwdstart.me", "FwdStart newsletter archive",
+		"https://world.hanzo.ai/v1/world/fwdstart", items)
 }
 
 // ── Tech events (Techmeme ICS + curated) ─────────────────────────────────────
