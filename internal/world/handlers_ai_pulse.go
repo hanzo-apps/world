@@ -31,7 +31,7 @@ const (
 	aiPulseInterval = 15 * time.Second // SSE re-emit cadence
 )
 
-// aiUsage is the measured inference volume (get-cloud-usages ?org=all).
+// aiUsage is the measured inference volume (ops/usages/cloud ?org=all).
 type aiUsage struct {
 	Window         string       `json:"window"`
 	RequestsPerSec float64      `json:"requestsPerSec"`
