@@ -26,7 +26,11 @@
 # ---- web stage: Vite static build (-> /app/dist) -------------------------
 FROM node:20-bookworm-slim AS web
 WORKDIR /app
-COPY package.json package-lock.json ./
+# pnpm-lock.yaml, not package-lock.json: the very next line runs
+# `pnpm install --frozen-lockfile`, and this repo ships a pnpm lockfile —
+# there is no package-lock.json, so the COPY failed with
+#   failed to calculate checksum of ref ...: "/package-lock.json": not found
+COPY package.json pnpm-lock.yaml ./
 RUN corepack enable && pnpm install --frozen-lockfile
 COPY . .
 # vite.config.ts: default base '/', default outDir 'dist'. VITE_VARIANT defaults
