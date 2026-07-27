@@ -1,30 +1,12 @@
-# pnpm settings for this app. There is no workspace here — world is one package —
-# but pnpm reads its settings from this file, so this is where they live.
-
-# pnpm does not run a dependency's install scripts unless it is named here, so this
-# list is the full set of packages allowed to execute code at install time.
-#
-# The three that are true ship a native binary or generate code and do not work
-# without doing so: esbuild is the bundler the build invokes, sharp is an image
-# codec, protobufjs generates its runtime.
-#
-# @vaadin/vaadin-usage-statistics is false deliberately. Its install script exists to
-# report usage back to the vendor; nothing in this app needs it to have run, and a
-# build machine reaching out to a third party is not something to enable by default.
-# It is listed rather than omitted so the decision is visible and does not get
-# silently flipped by the next person who runs `pnpm approve-builds`.
+# Install scripts run only for packages listed here.
 allowBuilds:
-  '@vaadin/vaadin-usage-statistics': false
+  '@vaadin/vaadin-usage-statistics': false  # telemetry postinstall; nothing needs it
   esbuild: true
   protobufjs: true
   sharp: true
 
-# pnpm refuses packages published in the last few days, so a compromised release has
-# to survive a cooling-off period before it can reach a build. Keep that for the
-# registry at large; exclude our own scopes, which we publish and consume the same
-# hour. Excluding by SCOPE rather than by version matters: pnpm rewrites a
-# per-version entry on every bump, and a file that rewrites itself during install
-# makes --frozen-lockfile fail in CI.
+# Our own scopes skip pnpm's new-release quarantine. Scope glob, not a version
+# pin: pnpm rewrites version entries on every bump and breaks --frozen-lockfile.
 minimumReleaseAgeExclude:
   - '@hanzo/*'
   - '@hanzogui/*'
