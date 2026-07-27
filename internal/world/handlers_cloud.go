@@ -20,7 +20,7 @@ import (
 // ladder (producePulse), best → last:
 //
 //   - VOLUME (requests/sec, 24h requests/tokens, series, model mix):
-//       1. the super-admin usage ledger (get-cloud-usages ?org=all, ClickHouse) —
+//       1. the super-admin usage ledger (ops/usages/cloud ?org=all, ClickHouse) —
 //          MEASURED and exact (tokens + spend); clears volumeModeled.
 //       2. else the REAL, public endpoints this same binary already serves: the
 //          native request-geo globe (traffic-globe, totals.rps_1m) for the
