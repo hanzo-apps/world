@@ -24,7 +24,12 @@
 #   HANZO_AI_KEY (+ HANZO_AI_BASE / HANZO_AI_MODEL) for the AI endpoints.
 
 # ---- web stage: Vite static build (-> /app/dist) -------------------------
-FROM node:20-bookworm-slim AS web
+# node:22 — package.json pins `packageManager: pnpm@11.17.0`, and corepack
+# activates exactly that. pnpm 11 uses Node builtins absent from Node 20, so
+# `corepack enable && pnpm install` died with ERR_UNKNOWN_BUILTIN_MODULE.
+# Same class as the golang base in hanzoai/search-fts5: the image has to be
+# new enough for the toolchain the repo declares.
+FROM node:22-bookworm-slim AS web
 WORKDIR /app
 # pnpm-lock.yaml, not package-lock.json: the very next line runs
 # `pnpm install --frozen-lockfile`, and this repo ships a pnpm lockfile —
