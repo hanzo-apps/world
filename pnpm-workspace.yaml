@@ -9,15 +9,3 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - '@hanzo/*'
   - '@hanzogui/*'
-
-# pnpm 11 reads onlyBuiltDependencies from THIS file, not package.json.
-# Without it `pnpm install` exits 1 with
-#   [ERR_PNPM_IGNORED_BUILDS] Ignored build scripts: esbuild, protobufjs, sharp
-# esbuild and sharp are native binaries — skipping their scripts would yield a
-# broken image even if the install were allowed to pass.
-# (hanzoai/hanzo.ai pins pnpm 9, where the package.json field is still honoured —
-# same symptom, different location.)
-onlyBuiltDependencies:
-  - esbuild
-  - protobufjs
-  - sharp
