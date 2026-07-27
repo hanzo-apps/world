@@ -15,7 +15,7 @@ import (
 // One credential, one base. The service token is the repo's established,
 // KMS-injected bearer (kms.go's fetch list) — it is NEVER sent to the browser.
 // All aggregate reads share it, so there is exactly one secret for ops to
-// provision. For the platform-wide reads (get-cloud-usages ?org=all and the
+// provision. For the platform-wide reads (ops/usages/cloud ?org=all and the
 // routing-ledger exports) it must be a super-admin bearer; a non-admin token
 // 4xxes upstream and every caller degrades to its honest demo/unavailable state.
 
@@ -39,7 +39,7 @@ func serviceAuth() map[string]string {
 	return map[string]string{"Authorization": "Bearer " + tok}
 }
 
-// ── platform usage ledger (ai GET /v1/get-cloud-usages) ───────────────────────
+// ── platform usage ledger (ai GET /v1/ops/usages/cloud) ──────────────────────
 
 // cloudUsageOverview decodes the fields world aggregates from ai's
 // object.CloudUsageOverview. The upstream is ClickHouse-backed; ?org=all is the
@@ -89,7 +89,7 @@ func (s *Server) fetchCloudUsage(ctx context.Context, rangeLabel string, hdr map
 		return nil, errNoServiceToken
 	}
 	var ov cloudUsageOverview
-	url := apiHost() + "/v1/get-cloud-usages?org=all&range=" + rangeLabel
+	url := apiHost() + "/v1/ops/usages/cloud?org=all&range=" + rangeLabel
 	if err := s.getJSON(ctx, url, hdr, &ov); err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func (s *Server) fetchCloudUsage(ctx context.Context, rangeLabel string, hdr map
 
 // intervalSeconds resolves the usage-series bucket width to seconds; 0 when
 // unresolvable so callers fall back to a window average instead of dividing by a
-// bogus interval. The upstream get-cloud-usages emits the width as a WORD enum
+// bogus interval. The upstream ops/usages/cloud emits the width as a WORD enum
 // ("hour"/"day"/"minute"), NOT a Go duration — time.ParseDuration fails on those
 // ("hour" needs to be "1h"), which silently forced usageRate to the flat 24h mean
 // (the "AI Compute usage is dead flat" bug). Handle the enum first, then still
