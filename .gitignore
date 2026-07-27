@@ -38,3 +38,8 @@ data/world.db
 data/world.db-wal
 data/world.db-shm
 /world
+
+# pnpm is the one package manager here — pnpm-lock.yaml is the tracked lockfile.
+package-lock.json
+yarn.lock
+bun.lockb
