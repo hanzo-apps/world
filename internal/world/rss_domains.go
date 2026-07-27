@@ -1,8 +1,9 @@
 package world
 
-// rssDomainList is the RSS proxy host allowlist (SSRF boundary), ported verbatim
-// from ALLOWED_DOMAINS in api/rss-proxy.js. Whitespace-separated; parsed once
-// into allowedRSSDomains at init.
+// rssDomainList is the RSS proxy host allowlist (SSRF boundary) — the live one:
+// world.hanzo.ai is this Go binary, so ALLOWED_DOMAINS in api/rss-proxy.js (the
+// legacy Vercel edge lane it was ported from) no longer gates anything.
+// Whitespace-separated; parsed once into allowedRSSDomains at init.
 const rssDomainList = `
 feeds.bbci.co.uk www.theguardian.com feeds.npr.org news.google.com www.aljazeera.com
 rss.cnn.com hnrss.org feeds.arstechnica.com www.theverge.com www.cnbc.com
@@ -34,4 +35,5 @@ www.lowyinstitute.org www.mei.edu www.stimson.org www.cnas.org carnegieendowment
 www.rand.org fas.org www.armscontrol.org www.nti.org thebulletin.org
 www.iss.europa.eu www.fao.org worldbank.org www.imf.org news.ycombinator.com
 www.coindesk.com cointelegraph.com
+www.reddit.com old.reddit.com www.youtube.com
 `

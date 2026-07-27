@@ -55,6 +55,7 @@ export {
 export {
   FEEDS,
   feedsFor,
+  topicFeeds,
   ALL_FEED_KEYS,
   INTEL_SOURCES,
 } from './feeds';
