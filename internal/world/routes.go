@@ -96,6 +96,10 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/youtube/live", s.handleYouTubeLive)
 	mux.HandleFunc("/v1/world/youtube/embed", s.handleYouTubeEmbed)
 	mux.HandleFunc("/v1/world/youtube/search", s.handleYouTubeSearch)
+	// Credentialed social platforms re-emitted as RSS on our own origin, so they
+	// stay ordinary Feeds client-side (handlers_social.go). Reddit/YouTube need no
+	// route — they publish real RSS and ride the rss-proxy.
+	mux.HandleFunc("/v1/world/social/", s.handleSocial)
 	mux.HandleFunc("/v1/world/monitors", s.handleMonitors)
 	mux.HandleFunc("/v1/world/monitors/matches", s.handleMonitorMatches)
 	// model-improvement consent opt-in (proxied to ai's OrgSettings, the source of truth)

@@ -55,7 +55,8 @@ function markSignalSeen(key: string): void {
 export function analyzeCorrelations(
   events: ClusteredEvent[],
   predictions: PredictionMarket[],
-  markets: MarketData[]
+  markets: MarketData[],
+  topics: string[] = []
 ): CorrelationSignal[] {
   const getSourceTypeFn = (source: string): SourceType => getSourceType(source) as SourceType;
 
@@ -66,7 +67,8 @@ export function analyzeCorrelations(
     previousSnapshot,
     getSourceTypeFn,
     isRecentDuplicate,
-    markSignalSeen
+    markSignalSeen,
+    topics
   );
 
   previousSnapshot = snapshot;

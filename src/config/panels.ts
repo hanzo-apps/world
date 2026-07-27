@@ -49,6 +49,7 @@ const FULL_PANELS: Record<string, PanelConfig> = {
   heatmap: { name: 'Sector Heatmap', enabled: true, priority: 2 },
   ai: { name: 'AI/ML', enabled: true, priority: 2 },
   layoffs: { name: 'Layoffs Tracker', enabled: true, priority: 2 },
+  social: { name: 'Social', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
   'satellite-fires': { name: 'Fires', enabled: true, priority: 2 },
   sentiment: { name: 'News Sentiment', enabled: true, priority: 2 },
@@ -194,6 +195,7 @@ const TECH_PANELS: Record<string, PanelConfig> = {
   rotation: { name: 'Rotation Scanner', enabled: true, priority: 1 },
   'etf-flows': { name: 'BTC ETF Tracker', enabled: true, priority: 2 },
   stablecoins: { name: 'Stablecoins', enabled: true, priority: 2 },
+  social: { name: 'Social', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
 };
 
@@ -324,6 +326,7 @@ const FINANCE_PANELS: Record<string, PanelConfig> = {
   'gcc-investments': { name: 'GCC Investments', enabled: true, priority: 2 },
   gccNews: { name: 'GCC Business News', enabled: true, priority: 2 },
   polymarket: { name: 'Predictions', enabled: true, priority: 2 },
+  social: { name: 'Social', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
 };
 
@@ -464,6 +467,7 @@ const CLOUD_PANELS: Record<string, PanelConfig> = {
   // universe as one D3 circle-pack) — available in every grid view, opt-in.
   'stations-wall': { name: 'News Wall', enabled: false, priority: 2 },
   'trading-bubble': { name: 'Markets Bubble', enabled: false, priority: 2 },
+  social: { name: 'Social', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
 };
 
@@ -564,6 +568,7 @@ const AI_PANELS: Record<string, PanelConfig> = {
   'tech-readiness': { name: 'Tech Readiness Index', enabled: true, priority: 2 },
   events: { name: 'Tech Events', enabled: true, priority: 2 },
   sentiment: { name: 'News Sentiment', enabled: true, priority: 2 },
+  social: { name: 'Social', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
 };
 
@@ -648,6 +653,7 @@ const CRYPTO_PANELS: Record<string, PanelConfig> = {
   regulation: { name: 'Crypto & Financial Regulation', enabled: true, priority: 2 },
   centralbanks: { name: 'Central Bank Watch', enabled: true, priority: 2 },
   'ai-analyst': { name: 'AI analyst', enabled: true, priority: 2 },
+  social: { name: 'Social', enabled: true, priority: 2 },
   monitors: { name: 'My Monitors', enabled: true, priority: 2 },
 };
 

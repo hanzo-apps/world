@@ -303,13 +303,12 @@ export function clusterNewsCore(
 // CORRELATION FUNCTIONS
 // ============================================================================
 
-function extractTopics(events: ClusteredEventCore[]): Map<string, number> {
+function extractTopics(events: ClusteredEventCore[], keywords: string[]): Map<string, number> {
   const topics = new Map<string, number>();
 
   for (const event of events) {
     const title = event.primaryTitle.toLowerCase();
-    for (const kw of TOPIC_KEYWORDS) {
-      if (SUPPRESSED_TRENDING_TERMS.has(kw)) continue;
+    for (const kw of keywords) {
       if (!containsTopicKeyword(title, kw)) continue;
       const velocity = event.velocity?.sourcesPerHour ?? 0;
       topics.set(kw, (topics.get(kw) ?? 0) + velocity + event.sourceCount);
@@ -466,6 +465,8 @@ export function detectTriangulation(
 /**
  * Analyze correlations between news, predictions, and markets.
  * Pure function - state management (snapshots, deduplication) handled by caller.
+ * `topics` are the user's own watched topics, unioned into the TOPIC_KEYWORDS
+ * seed. Passed in rather than read from storage: this runs inside a worker.
  */
 export function analyzeCorrelationsCore(
   events: ClusteredEventCore[],
@@ -474,12 +475,18 @@ export function analyzeCorrelationsCore(
   previousSnapshot: StreamSnapshot | null,
   getSourceType: (source: string) => SourceType,
   isRecentDuplicate: (key: string) => boolean,
-  markSignalSeen: (key: string) => void
+  markSignalSeen: (key: string) => void,
+  topics: string[] = []
 ): { signals: CorrelationSignalCore[]; snapshot: StreamSnapshot } {
   const signals: CorrelationSignalCore[] = [];
   const now = Date.now();
 
-  const newsTopics = extractTopics(events);
+  // The suppression list filters generic seed terms out of trending noise; a topic
+  // the user typed is deliberate, so it is never suppressed.
+  const newsTopics = extractTopics(events, [...new Set([
+    ...TOPIC_KEYWORDS.filter(kw => !SUPPRESSED_TRENDING_TERMS.has(kw)),
+    ...topics,
+  ])]);
   const pipelineFlowSignals = detectPipelineFlowDrops(events, isRecentDuplicate, markSignalSeen);
   const pipelineFlowMentions = pipelineFlowSignals.length;
 

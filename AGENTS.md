@@ -36,6 +36,24 @@ Order of preference for "look at / poke the UI": Hanzo MCP browser → Playwrigh
 - `satellite`/`terrain` need `VITE_MAPBOX_TOKEN` (from KMS `hanzo/deploy/`, never
   in git); `dark`/`dot` are keyless CartoDB.
 
+## Sources & topics
+
+- A source is a `Feed` (`src/types/index.ts`) in `src/config/feeds.ts`, fetched by
+  `fetchCategoryFeeds` (`src/services/rss.ts`). There is no second fetcher.
+- Publishes real RSS/Atom → add the host to `rssDomainList`
+  (`internal/world/rss_domains.go`, the SSRF boundary) and wrap it in `rss()`.
+  Doesn't → emit RSS 2.0 on our own origin with `buildRSS`
+  (`internal/world/handlers_social.go`) and reference the route as a plain `Feed`.
+  A same-origin emitter must call `s.ingestFeedItems` itself — it never passes
+  through `handleRSSProxy`, which is what normally folds items into the lake.
+- Social: Reddit + YouTube are keyless. X / TikTok / LinkedIn need
+  `X_BEARER_TOKEN` (or `TWITTER_BEARER_TOKEN`), `TIKTOK_ACCESS_TOKEN`,
+  `LINKEDIN_ACCESS_TOKEN` + `LINKEDIN_ORG_URN` — from KMS `hanzo/world-secrets`,
+  never in git. Absent, each serves an empty channel and logs one skip line.
+- A user topic is a `Monitor` (per-user SQLite, namespace `monitors`), not a
+  separate store. `topicFeeds()` turns it into Feeds so it pulls; the seed list
+  in `TOPIC_KEYWORDS` is only a default, unioned with the user's own topics.
+
 ## Release
 
 Bump `package.json` PATCH (x.y.z → x.y.z+1, never a lazy major), tag `v<version>`,

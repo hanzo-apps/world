@@ -1,4 +1,4 @@
-import type { Feed } from '@/types';
+import type { Feed, Monitor } from '@/types';
 import { SITE_VARIANT } from './variant';
 
 // Helper to create RSS proxy URL (Vercel)
@@ -12,6 +12,16 @@ const railwayBaseUrl = wsRelayUrl
   : '';
 const railwayRss = (url: string) =>
   railwayBaseUrl ? `${railwayBaseUrl}/rss?url=${encodeURIComponent(url)}` : rss(url);
+
+// Social platforms. Reddit and YouTube publish real RSS/Atom, so they ride the
+// same rss() proxy as every other feed. X, TikTok and LinkedIn expose posts only
+// behind a credentialed API, so the backend re-emits them as RSS on our own
+// origin (internal/world/handlers_social.go) — which keeps them ordinary Feeds
+// here, on the ONE fetch path. A platform with no key configured serves an empty
+// channel: the panel just shows fewer sources, nothing breaks.
+const reddit = (path: string) => rss(`https://www.reddit.com${path}`);
+const youtube = (channelId: string) => rss(`https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`);
+const social = (platform: string, q: string) => `/v1/world/social/${platform}?q=${encodeURIComponent(q)}`;
 
 // Source tier system for prioritization (lower = more authoritative)
 // Tier 1: Wire services - fastest, most reliable breaking news
@@ -244,7 +254,7 @@ export function getSourceTier(sourceName: string): number {
   return SOURCE_TIERS[sourceName] ?? 4; // Default to tier 4 if unknown
 }
 
-export type SourceType = 'wire' | 'gov' | 'intel' | 'mainstream' | 'market' | 'tech' | 'other';
+export type SourceType = 'wire' | 'gov' | 'intel' | 'mainstream' | 'market' | 'tech' | 'social' | 'other';
 
 export const SOURCE_TYPES: Record<string, SourceType> = {
   // Wire services - fastest, most authoritative
@@ -320,6 +330,19 @@ export const SOURCE_TYPES: Record<string, SourceType> = {
   'This Week in Startups': 'tech', 'The Twenty Minute VC': 'tech',
   'Hard Fork (NYT)': 'tech', 'Pivot (Vox)': 'tech', 'Stratechery': 'tech',
   'Benedict Evans': 'tech', 'How I Built This': 'tech', 'Masters of Scale': 'tech',
+
+  // Social — crowd/creator sourced, so they carry their own type rather than
+  // inheriting the tier-4 'other' bucket. Tier stays 4 (getSourceTier's default).
+  'Reddit World News': 'social', 'Reddit Geopolitics': 'social', 'Reddit News': 'social',
+  'Reddit Technology': 'social', 'Reddit MachineLearning': 'social', 'Reddit LocalLLaMA': 'social',
+  'Reddit Startups': 'social', 'Reddit Investing': 'social', 'Reddit Wall Street': 'social',
+  'Reddit Crypto': 'social',
+  'YouTube Reuters': 'social', 'YouTube BBC News': 'social', 'YouTube Al Jazeera': 'social',
+  'YouTube TechCrunch': 'social', 'YouTube Y Combinator': 'social', 'YouTube Bloomberg': 'social',
+  'YouTube CNBC': 'social',
+  'X Breaking': 'social', 'X AI': 'social', 'X Markets': 'social',
+  'TikTok World': 'social', 'TikTok Tech': 'social', 'TikTok Finance': 'social',
+  'LinkedIn Pulse': 'social', 'LinkedIn Tech': 'social', 'LinkedIn Markets': 'social',
 };
 
 export function getSourceType(sourceName: string): SourceType {
@@ -569,6 +592,17 @@ const FULL_FEEDS: Record<string, Feed[]> = {
     { name: 'Reuters Energy', url: rss('https://news.google.com/rss/search?q=site:reuters.com+(oil+OR+gas+OR+energy+OR+OPEC)+when:3d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Mining & Resources', url: rss('https://news.google.com/rss/search?q=(lithium+OR+"rare+earth"+OR+cobalt+OR+mining)+when:3d&hl=en-US&gl=US&ceid=US:en') },
   ],
+  social: [
+    { name: 'Reddit World News', url: reddit('/r/worldnews/.rss') },
+    { name: 'Reddit Geopolitics', url: reddit('/r/geopolitics/.rss') },
+    { name: 'Reddit News', url: reddit('/r/news/.rss') },
+    { name: 'YouTube Reuters', url: youtube('UChqUTb7kYRX8-EiaN3XFrSQ') },
+    { name: 'YouTube BBC News', url: youtube('UC16niRr50-MSBwiO3YDb3RA') },
+    { name: 'YouTube Al Jazeera', url: youtube('UCNye-wNBqNL5ZzHSJj3l8Bg') },
+    { name: 'X Breaking', url: social('x', 'breaking news') },
+    { name: 'TikTok World', url: social('tiktok', 'world news') },
+    { name: 'LinkedIn Pulse', url: social('linkedin', 'geopolitics') },
+  ],
 };
 
 // Tech/AI variant feeds
@@ -793,6 +827,17 @@ const TECH_FEEDS: Record<string, Feed[]> = {
     { name: 'How I Built This', url: rss('https://news.google.com/rss/search?q="How+I+Built+This"+Guy+Raz+when:14d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Startup Podcasts', url: rss('https://news.google.com/rss/search?q=("Masters+of+Scale"+OR+"The+Pitch+podcast"+OR+"startup+podcast")+episode+when:14d&hl=en-US&gl=US&ceid=US:en') },
   ],
+  social: [
+    { name: 'Reddit Technology', url: reddit('/r/technology/.rss') },
+    { name: 'Reddit MachineLearning', url: reddit('/r/MachineLearning/.rss') },
+    { name: 'Reddit LocalLLaMA', url: reddit('/r/LocalLLaMA/.rss') },
+    { name: 'Reddit Startups', url: reddit('/r/startups/.rss') },
+    { name: 'YouTube TechCrunch', url: youtube('UCCjyq_K1Xwfg8Lndy7lKMpA') },
+    { name: 'YouTube Y Combinator', url: youtube('UCcefcZRL2oaA_uBNeo5UOWg') },
+    { name: 'X AI', url: social('x', 'AI OR LLM OR "machine learning"') },
+    { name: 'TikTok Tech', url: social('tiktok', 'tech') },
+    { name: 'LinkedIn Tech', url: social('linkedin', 'artificial intelligence') },
+  ],
 };
 
 // Finance/Trading variant feeds (all free RSS / Google News proxies)
@@ -881,6 +926,16 @@ const FINANCE_FEEDS: Record<string, Feed[]> = {
     { name: 'Gulf Investments', url: rss('https://news.google.com/rss/search?q=("Saudi+Arabia"+OR+"UAE"+OR+"Abu+Dhabi")+investment+infrastructure+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Vision 2030', url: rss('https://news.google.com/rss/search?q="Vision+2030"+(project+OR+investment+OR+announced)+when:14d&hl=en-US&gl=US&ceid=US:en') },
   ],
+  social: [
+    { name: 'Reddit Investing', url: reddit('/r/investing/.rss') },
+    { name: 'Reddit Wall Street', url: reddit('/r/wallstreetbets/.rss') },
+    { name: 'Reddit Crypto', url: reddit('/r/CryptoCurrency/.rss') },
+    { name: 'YouTube Bloomberg', url: youtube('UCIALMKvObZNtJ6AmdCLP7Lg') },
+    { name: 'YouTube CNBC', url: youtube('UCvJJ_dzjViJCoLf5uKUTwoA') },
+    { name: 'X Markets', url: social('x', 'markets OR stocks OR bitcoin') },
+    { name: 'TikTok Finance', url: social('tiktok', 'finance') },
+    { name: 'LinkedIn Markets', url: social('linkedin', 'markets') },
+  ],
 };
 
 // Variant-aware exports
@@ -898,6 +953,30 @@ export function feedsFor(variant: string): Record<string, Feed[]> {
 
 // Load-time snapshot for the initial variant (boot-only reads).
 export const FEEDS = feedsFor(SITE_VARIANT);
+
+// A user topic is only a topic if it PULLS. topicFeeds turns the keywords the
+// user watches (their Monitors — the one per-user topic store) into ordinary
+// Feeds, so they ride the same fetchCategoryFeeds path as every curated
+// category and land in the same server-side lake, which is what makes the
+// backend able to match that topic across devices. Deduped by keyword. LinkedIn
+// is absent on purpose: it publishes no content search, so its feed is the same
+// org timeline whatever the topic.
+export function topicFeeds(monitors: Monitor[]): Feed[] {
+  const seen = new Set<string>();
+  const out: Feed[] = [];
+  for (const kw of monitors.flatMap(m => m.keywords)) {
+    const q = kw.trim();
+    if (!q || seen.has(q.toLowerCase())) continue;
+    seen.add(q.toLowerCase());
+    out.push(
+      { name: `Topic · ${q}`, url: rss(`https://news.google.com/rss/search?q=${encodeURIComponent(q)}+when:2d&hl=en-US&gl=US&ceid=US:en`) },
+      { name: `Reddit · ${q}`, url: reddit(`/search.rss?sort=new&q=${encodeURIComponent(q)}`) },
+      { name: `X · ${q}`, url: social('x', q) },
+      { name: `TikTok · ${q}`, url: social('tiktok', q) },
+    );
+  }
+  return out;
+}
 
 // Every feed-category key across all variants. The app creates a NewsPanel per
 // key ONCE at boot so a later in-place switch already has the target variant's

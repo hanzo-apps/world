@@ -206,7 +206,8 @@ class AnalysisWorkerManager {
   async analyzeCorrelations(
     clusters: ClusteredEvent[],
     predictions: PredictionMarket[],
-    markets: MarketData[]
+    markets: MarketData[],
+    topics: string[] = []
   ): Promise<CorrelationSignal[]> {
     await this.waitForReady();
 
@@ -232,6 +233,7 @@ class AnalysisWorkerManager {
         predictions,
         markets,
         sourceTypes: SOURCE_TYPES as Record<string, SourceType>,
+        topics,
       });
     });
   }

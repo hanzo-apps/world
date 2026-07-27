@@ -103,4 +103,7 @@ var curatedFeedSeed = []string{
 	"https://www.cnbc.com/id/19854910/device/rss/rss.html",
 	"https://seekingalpha.com/market_currents.xml",
 	"https://www.ft.com/rss/home",
+	// social (the keyless half — Reddit/YouTube publish real feeds)
+	"https://www.reddit.com/r/worldnews/.rss",
+	"https://www.reddit.com/r/technology/.rss",
 }
