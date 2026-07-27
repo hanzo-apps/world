@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/world",
-  "description": "Hanzo World — real-time global intelligence dashboard.",
+  "description": "Hanzo World \u2014 real-time global intelligence dashboard.",
   "private": true,
   "version": "2.4.51",
   "packageManager": "pnpm@11.17.0",
@@ -98,5 +98,12 @@
     "react-native-web": "^0.21.2",
     "supercluster": "^8.0.1",
     "topojson-client": "^3.1.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "protobufjs",
+      "sharp"
+    ]
   }
 }
