@@ -4,7 +4,7 @@ import { isDesktopRuntime, getRemoteApiBaseUrl } from '@/services/runtime';
 // Model-improvement consent — the ONE client path to the opt-in that actually lives
 // in ai's OrgSettings.TrainingContribution (the single source of truth the automated
 // judge + the router trainer read). Served same-origin by world's Go proxy
-// (/v1/world/training-contribution → ai get-/update-training-contribution), which
+// (/v1/world/training-contribution → ai GET/PATCH /v1/ai/training-contribution), which
 // forwards the caller's org-scoped bearer; ai self-scopes to the caller's OWN org.
 //
 // Privacy-safe by construction: a signed-out caller or ANY error reads `false` (OFF),

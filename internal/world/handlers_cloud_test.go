@@ -76,7 +76,7 @@ func TestCloudPulseHonestEmpty(t *testing.T) {
 
 // TestCloudPulseServiceVolume proves the real path: with a service token and a
 // reachable super-admin usage ledger, /v1/world/cloud-pulse folds MEASURED platform
-// volume (get-cloud-usages ?org=all) + visor counts + a REAL uptime from the status
+// volume (ops/usages/cloud ?org=all) + visor counts + a REAL uptime from the status
 // page (up/total), drops demo:true AND volumeModeled:true, and surfaces the ledger's
 // top models — never modeled.
 func TestCloudPulseServiceVolume(t *testing.T) {
@@ -90,7 +90,7 @@ func TestCloudPulseServiceVolume(t *testing.T) {
 	upstream.HandleFunc("/v1/gpus", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"gpus":[{"region":"nyc"},{"region":"nyc"},{"region":"sfo"}]}`))
 	})
-	upstream.HandleFunc("/v1/get-cloud-usages", func(w http.ResponseWriter, r *http.Request) {
+	upstream.HandleFunc("/v1/ops/usages/cloud", func(w http.ResponseWriter, r *http.Request) {
 		if got := r.URL.Query().Get("org"); got != "all" {
 			t.Errorf("want org=all (platform-wide), got %q", got)
 		}
@@ -180,7 +180,7 @@ func TestCloudPulseRouterFallback(t *testing.T) {
 		_, _ = w.Write([]byte(`{"gpus":[{"region":"nyc"},{"region":"sfo"}]}`))
 	})
 	// Ledger unavailable (e.g. a non-super-admin token) → the fallback must engage.
-	upstream.HandleFunc("/v1/get-cloud-usages", func(w http.ResponseWriter, _ *http.Request) {
+	upstream.HandleFunc("/v1/ops/usages/cloud", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 	})
 	// Real routed volume + hourly series + per-model mix (scope MUST be platform).
@@ -299,7 +299,7 @@ func TestCloudPulseAdminBearer(t *testing.T) {
 	upstream.HandleFunc("/v1/gpus", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"gpus":[{"region":"nyc"}]}`))
 	})
-	upstream.HandleFunc("/v1/get-cloud-usages", func(w http.ResponseWriter, r *http.Request) {
+	upstream.HandleFunc("/v1/ops/usages/cloud", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer admin-token" {
 			t.Errorf("all-org ledger must be read with the caller's bearer, got %q", r.Header.Get("Authorization"))
 		}
@@ -389,7 +389,7 @@ func TestCloudPulseAdminLLMObservability(t *testing.T) {
 		_, _ = w.Write([]byte(`{"machines":[{"region":"nyc","status":"active"}]}`))
 	})
 	api.HandleFunc("/v1/gpus", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{"gpus":[]}`)) })
-	api.HandleFunc("/v1/get-cloud-usages", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusForbidden) })
+	api.HandleFunc("/v1/ops/usages/cloud", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusForbidden) })
 	// LLM observability: real platform usage + top models by REAL name.
 	api.HandleFunc("/v1/admin/o11y", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer admin-token" {
