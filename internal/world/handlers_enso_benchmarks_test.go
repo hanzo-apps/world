@@ -3,7 +3,6 @@ package world
 import (
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 )
 
@@ -20,10 +19,7 @@ func getEnsoBenchmarks(t *testing.T, iamStatus int, iamBody, bearer string) (*ht
 	t.Setenv("ENSO_BENCH_URL", "")        // force the embedded snapshot
 
 	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
+	ts := serveLive(t, s)
 
 	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/v1/world/enso-benchmarks", nil)
 	if bearer != "" {

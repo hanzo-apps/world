@@ -42,10 +42,7 @@ func TestCloudRouterStatsProxy(t *testing.T) {
 	t.Setenv("HANZO_API_BASE", upstream.URL)
 
 	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
+	ts := serveLive(t, s)
 
 	get := func(path string) *http.Response {
 		resp, err := http.Get(ts.URL + path)

@@ -25,6 +25,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/zap-proto/zip"
+
 	"github.com/hanzoai/world/internal/world"
 )
 
@@ -51,25 +53,17 @@ func main() {
 	srv.StartDatastore(rootCtx) // shared feed warmer + lake write-behind/prune
 	srv.StartFund(rootCtx)      // autonomous PAPER-only multi-asset fund brain
 	srv.StartAltAssets(rootCtx) // hourly Christie's auctions + LuxuryEstate warmer
-	mux := http.NewServeMux()
-	srv.Mount(mux) // /v1/world/* routes
 
-	// Static SPA + fallback handles everything not matched by an /api route.
+	app := srv.NewApp() // /v1/world/* + /v1/feedback
+
+	// Static SPA + fallback handles everything not matched by a /v1 route.
 	// gzipStatic wraps ONLY this handler — /v1/world/* keeps its streaming
 	// endpoints unbuffered.
-	mux.Handle("/", gzipStatic(newSPAHandler(*root)))
-
-	httpSrv := &http.Server{
-		Addr:              *addr,
-		Handler:           logRequests(mux),
-		ReadHeaderTimeout: 15 * time.Second,
-		WriteTimeout:      60 * time.Second,
-		IdleTimeout:       120 * time.Second,
-	}
+	app.All("/*", zip.AdaptNetHTTP(gzipStatic(newSPAHandler(*root))))
 
 	go func() {
 		log.Printf("world: serving SPA from %q and /v1/world/* on %s", *root, *addr)
-		if err := httpSrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := app.Listen(listenAddr(*addr)); err != nil {
 			log.Fatalf("world: server error: %v", err)
 		}
 	}()
@@ -78,7 +72,17 @@ func main() {
 	log.Printf("world: shutting down")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	_ = httpSrv.Shutdown(ctx)
+	_ = app.ShutdownWithContext(ctx)
+}
+
+// listenAddr names the transport for addr. zip picks the wire from the scheme
+// and a bare address means ZAP, so the plain host:port the CR sets in PORT /
+// WORLD_ADDR is spelled out as HTTP — the SPA is served to browsers.
+func listenAddr(addr string) string {
+	if strings.Contains(addr, "://") {
+		return addr
+	}
+	return "http://" + addr
 }
 
 // spaHandler serves files from root and falls back to index.html for any GET
@@ -171,18 +175,6 @@ func setCacheHeaders(w http.ResponseWriter, rel string) {
 func hasExt(rel string) bool {
 	base := filepath.Base(rel)
 	return strings.Contains(base, ".")
-}
-
-func logRequests(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/v1/world/") {
-			start := time.Now()
-			next.ServeHTTP(w, r)
-			log.Printf("api %s %s %s", r.Method, r.URL.Path, time.Since(start).Round(time.Millisecond))
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
 }
 
 func envOr(key, def string) string {

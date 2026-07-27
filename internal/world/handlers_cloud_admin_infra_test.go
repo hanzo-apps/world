@@ -69,10 +69,7 @@ func getInfra(t *testing.T, route string, iamStatus int, iamBody, bearer string)
 	t.Setenv("HANZO_API_BASE", adminUpstream(t).URL)
 
 	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
+	ts := serveLive(t, s)
 
 	req, _ := http.NewRequest(http.MethodGet, ts.URL+route, nil)
 	if bearer != "" {

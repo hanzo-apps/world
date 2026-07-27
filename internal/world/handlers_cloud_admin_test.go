@@ -16,10 +16,7 @@ import (
 // the live gate; here we assert the hermetic fail-closed default.)
 func TestCloudAdminGateFailsClosed(t *testing.T) {
 	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
+	ts := serveLive(t, s)
 
 	adminRoutes := []string{
 		"/v1/world/cloud/fleet",

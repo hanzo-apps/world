@@ -185,9 +185,7 @@ func rpc(t *testing.T, ts *httptest.Server, id int, method string, params any) r
 // upstream fetch), so the test is hermetic.
 func TestJSONRPCRoundTrip(t *testing.T) {
 	srv := world.NewServer()
-	mux := http.NewServeMux()
-	srv.Mount(mux)
-	ts := httptest.NewServer(mux)
+	ts := httptest.NewServer(world.Handler(srv.NewApp()))
 	defer ts.Close()
 
 	// initialize
@@ -330,9 +328,7 @@ func TestJSONRPCRoundTrip(t *testing.T) {
 // TestGETReturns405 confirms the transport rejects GET (no server-initiated SSE).
 func TestGETReturns405(t *testing.T) {
 	srv := world.NewServer()
-	mux := http.NewServeMux()
-	srv.Mount(mux)
-	ts := httptest.NewServer(mux)
+	ts := httptest.NewServer(world.Handler(srv.NewApp()))
 	defer ts.Close()
 
 	res, err := http.Get(ts.URL + mcp.Endpoint)

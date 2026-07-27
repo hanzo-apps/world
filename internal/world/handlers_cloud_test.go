@@ -32,10 +32,7 @@ func TestCloudPulseHonestEmpty(t *testing.T) {
 	t.Setenv("HANZO_STATUS_BASE", deadURL)
 
 	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
+	ts := serveLive(t, s)
 
 	resp, err := http.Get(ts.URL + "/v1/world/cloud-pulse")
 	if err != nil {
@@ -116,10 +113,7 @@ func TestCloudPulseServiceVolume(t *testing.T) {
 	t.Setenv("HANZO_STATUS_BASE", up.URL)
 
 	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
+	ts := serveLive(t, s)
 
 	resp, err := http.Get(ts.URL + "/v1/world/cloud-pulse")
 	if err != nil {
@@ -207,10 +201,7 @@ func TestCloudPulseRouterFallback(t *testing.T) {
 	t.Setenv("HANZO_STATUS_BASE", up.URL) // no status board on this mux → uptime honestly 0
 
 	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
+	ts := serveLive(t, s)
 
 	resp, err := http.Get(ts.URL + "/v1/world/cloud-pulse")
 	if err != nil {
@@ -318,10 +309,7 @@ func TestCloudPulseAdminBearer(t *testing.T) {
 	t.Setenv("WORLD_ADMIN_ORGS", "hanzo") // operator org resolves via deploy env, not code
 
 	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
+	ts := serveLive(t, s)
 
 	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/v1/world/cloud-pulse", nil)
 	req.Header.Set("Authorization", "Bearer admin-token")
@@ -409,10 +397,7 @@ func TestCloudPulseAdminLLMObservability(t *testing.T) {
 	t.Setenv("WORLD_ADMIN_ORGS", "hanzo") // operator org resolves via deploy env, not code
 
 	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
+	ts := serveLive(t, s)
 
 	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/v1/world/cloud-pulse", nil)
 	req.Header.Set("Authorization", "Bearer admin-token")

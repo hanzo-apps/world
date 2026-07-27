@@ -36,13 +36,10 @@ func (u *upstreamFeedback) server(t *testing.T) *httptest.Server {
 	}))
 }
 
-func newFeedbackTestServer(t *testing.T, base string) *httptest.Server {
+func newFeedbackTestServer(t *testing.T, base string) *liveServer {
 	s := NewServer()
 	s.ai.base = base
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
+	ts := serveLive(t, s)
 	return ts
 }
 
@@ -203,9 +200,7 @@ func TestAnalystResponseCarriesID(t *testing.T) {
 
 	s := NewServer()
 	s.ai.base = ai.URL
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
+	ts := serveLive(t, s)
 	defer ts.Close()
 
 	body := `{"messages":[{"role":"user","content":"hi"}],"context":""}`

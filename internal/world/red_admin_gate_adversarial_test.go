@@ -90,10 +90,7 @@ func TestRedAdminGateMatrix(t *testing.T) {
 			t.Setenv("WORLD_ADMIN_ORGS", tc.adminOrgsEnv)
 
 			s := NewServer()
-			mux := http.NewServeMux()
-			s.Mount(mux)
-			ts := httptest.NewServer(mux)
-			t.Cleanup(ts.Close)
+			ts := serveLive(t, s)
 
 			req, _ := http.NewRequest(http.MethodGet, ts.URL+adminRoute, nil)
 			if tc.bearer != "" {
@@ -129,10 +126,7 @@ func TestRedSharedCacheNoElevation(t *testing.T) {
 	t.Setenv("HANZO_API_BASE", api.URL)
 
 	s := NewServer()
-	mux := http.NewServeMux()
-	s.Mount(mux)
-	ts := httptest.NewServer(mux)
-	t.Cleanup(ts.Close)
+	ts := serveLive(t, s)
 
 	bearer := "Bearer settings-first"
 
