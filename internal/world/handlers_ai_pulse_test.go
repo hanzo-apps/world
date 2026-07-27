@@ -24,7 +24,7 @@ func aiPulseUpstream(t *testing.T) *httptest.Server {
 	mux.HandleFunc("/v1/models", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"data":[{"id":"zen-1"},{"id":"zen-omni-30b"}]}`))
 	})
-	mux.HandleFunc("/v1/ops/usages/cloud", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/v1/ai/usages/cloud", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{
 			"range":"24h","interval":"1h",
 			"totals":{"tokens":1180000000,"requests":1000000,"spendCents":42000,"models":2},
