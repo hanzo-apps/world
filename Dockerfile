@@ -27,18 +27,18 @@
 FROM node:20-bookworm-slim AS web
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN corepack enable && pnpm install --frozen-lockfile
 COPY . .
 # vite.config.ts: default base '/', default outDir 'dist'. VITE_VARIANT defaults
 # to the full layer set; no build-time secrets are required (the runtime API base
 # is same-origin, resolved in the browser).
 ARG VITE_MAPBOX_TOKEN
 ENV VITE_MAPBOX_TOKEN=$VITE_MAPBOX_TOKEN
-RUN npm run build
+RUN pnpm build
 # The @hanzo/gui (Tamagui) React rewrite, built to /app/dist-react as the opt-in
 # canary surface. Served only to sessions that pass ?react (see cmd/world:
 # canaryHandler); the vanilla dist above stays the default.
-RUN npm run build:react
+RUN pnpm build:react
 
 # ---- go stage: build the static server binary (CGO-free) -----------------
 # go 1.26: go.mod requires >= 1.26.4 (github.com/hanzoai/sqlite drop-in). The
