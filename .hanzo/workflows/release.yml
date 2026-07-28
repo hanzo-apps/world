@@ -112,8 +112,14 @@ jobs:
           # no ARG). Carried here so the capability survives the port. Unset today —
           # the live 2.4.51 bundle contains no pk.* token either, so an empty value
           # is faithful, not a regression; set the repo secret to start baking it.
+          # APP_VERSION: the number THIS run just computed, handed to the Vite build so
+          # the bundle self-reports the tag it ships under. Without it __APP_VERSION__
+          # falls back to package.json, which no release ever writes — main says 2.4.59
+          # while this job cut 2.4.60 — and that value keys the chunk-reload guard, so a
+          # frozen key means browsers keep serving stale chunks across a deploy.
           build-args: |
             VITE_MAPBOX_TOKEN=${{ secrets.VITE_MAPBOX_TOKEN }}
+            APP_VERSION=${{ steps.ver.outputs.version }}
       - name: Verify the pushed image is pullable (guard the image ⇔ tag invariant)
         # build-push-action can exit 0 while the manifest isn't yet resolvable at the
         # registry. Prove the image resolves BEFORE creating the git tag, so a bad push
