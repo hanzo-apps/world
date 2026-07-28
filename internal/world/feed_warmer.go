@@ -19,9 +19,11 @@ import (
 // fresh is skipped, so N pods don't all hammer the same upstream every cycle;
 // whichever pod refreshes first, the rest read its result.
 const (
-	feedWarmInterval     = 5 * time.Minute
-	feedWarmParallel     = 8
-	feedWarmFetchTimeout = 10 * time.Second
+	feedWarmInterval = 5 * time.Minute
+	// feedWarmParallel bounds concurrent HOSTS, not feeds. A host's feeds are
+	// walked one at a time because that is the unit an upstream budgets by (see
+	// hostGate) — fetching them in parallel just converts them into 429s.
+	feedWarmParallel = 8
 	// feedWarmFreshWindow: skip refetch when a cached copy is younger than this
 	// (slightly under the interval so each cycle still refreshes its own feeds).
 	feedWarmFreshWindow = 4 * time.Minute
@@ -43,44 +45,62 @@ func (s *Server) startFeedWarmer(ctx context.Context) {
 	}()
 }
 
-// warmFeeds refreshes every warm feed in parallel (bounded), skipping any whose
-// shared copy is still fresh. Each fetch is independently bounded; one slow
-// upstream cannot hold up the rest.
+// warmFeeds refreshes every stale warm feed, HOST BY HOST: distinct hosts run in
+// parallel (bounded), one host's feeds run one after another. Grouping is what
+// keeps a rate-limited upstream from starving the rest — a Reddit feed waiting out
+// its window would otherwise sit on a shared slot, and ten of them hold every
+// slot there is. Only one cycle runs at a time: a paced host can outlast the
+// interval, and overlapping cycles would just queue duplicate work behind it.
 func (s *Server) warmFeeds(ctx context.Context) {
+	if !s.warming.TryLock() {
+		return // previous cycle still draining a slow host
+	}
+	defer s.warming.Unlock()
+
 	urls := s.feeds.WarmURLs(ctx)
-	if len(urls) == 0 {
+	byHost := make(map[string][]string, len(urls))
+	stale := 0
+	for _, u := range urls {
+		if age, ok := s.feeds.Age(ctx, u); ok && age < feedWarmFreshWindow {
+			continue // a peer (or an earlier cycle) already refreshed it
+		}
+		h := feedHost(u)
+		byHost[h] = append(byHost[h], u)
+		stale++
+	}
+	if stale == 0 {
 		return
 	}
 	sem := make(chan struct{}, feedWarmParallel)
 	var wg sync.WaitGroup
-	refreshed := 0
 	var mu sync.Mutex
-	for _, u := range urls {
+	refreshed := 0
+	for _, group := range byHost {
 		if ctx.Err() != nil {
 			break
 		}
-		if age, ok := s.feeds.Age(ctx, u); ok && age < feedWarmFreshWindow {
-			continue // a peer (or an earlier cycle) already refreshed it
-		}
 		wg.Add(1)
 		sem <- struct{}{}
-		go func(u string) {
+		go func(group []string) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			fctx, cancel := context.WithTimeout(ctx, feedWarmFetchTimeout)
-			defer cancel()
-			if body, ok := s.fetchFeedBody(fctx, u); ok {
-				s.feeds.Put(u, body)
-				s.ingestFeedItems(u, body)
-				mu.Lock()
-				refreshed++
-				mu.Unlock()
+			for _, u := range group {
+				if ctx.Err() != nil {
+					return
+				}
+				if body, ok := s.fetchFeedBody(ctx, u); ok {
+					s.feeds.Put(u, body)
+					s.ingestFeedItems(u, body)
+					mu.Lock()
+					refreshed++
+					mu.Unlock()
+				}
 			}
-		}(u)
+		}(group)
 	}
 	wg.Wait()
 	if refreshed > 0 {
-		logf("world-feeds: warmed %d/%d feeds", refreshed, len(urls))
+		logf("world-feeds: warmed %d/%d feeds across %d hosts", refreshed, stale, len(byHost))
 	}
 }
 
