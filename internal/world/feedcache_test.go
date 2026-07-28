@@ -41,6 +41,7 @@ func TestFeedCacheSharedAcrossPods(t *testing.T) {
 
 	const url = "https://feeds.example.com/rss.xml"
 	body := []byte("<rss><channel><item><title>Shared</title></item></channel></rss>")
+	podA.Want(url) // a request on podA…
 	podA.Put(url, body)
 
 	if podB.Len() != 0 {
@@ -53,9 +54,54 @@ func TestFeedCacheSharedAcrossPods(t *testing.T) {
 	if podB.Len() != 1 {
 		t.Fatal("podB should have backfilled L1 from L2")
 	}
-	// The warm-URL set is fleet-wide (shared set), so podB knows to keep it fresh.
+	// …is demand the whole fleet honours: podB, which never saw the request, knows
+	// to keep it fresh.
 	if !hasURL(podB.WarmURLs(context.Background()), url) {
 		t.Fatal("shared warm set missing the demand-added url")
+	}
+}
+
+// The warm set must be able to SHRINK. The frontend synthesizes a feed per user
+// topic, so a set that only ever grows means every keyword anyone ever typed is
+// re-fetched by every pod every cycle, forever — including after the topic is
+// deleted. Demand nobody renews within warmTTL is dropped from both tiers.
+func TestWarmSetForgetsUnrequestedFeeds(t *testing.T) {
+	mr := miniredis.RunT(t)
+	kvc := kv.Open(mr.Addr(), "")
+	t.Cleanup(kvc.Close)
+	c := NewFeedCache(kvc, 0, []string{"https://seed.example/rss"})
+
+	const topic = "https://news.google.com/rss/search?q=zebra"
+	c.Want(topic)
+	c.Put(topic, []byte("<rss/>")) // the warmer's write-through must not renew demand
+	if !hasURL(c.WarmURLs(context.Background()), topic) {
+		t.Fatal("a requested feed must be warm")
+	}
+
+	// Age the demand past its window in both tiers — the score IS the last time
+	// anyone asked, so re-registering it in the past is exactly "nobody asked since".
+	stale := time.Now().Add(-warmTTL - time.Minute)
+	kvc.ZAdd(context.Background(), warmSetKey, stale, topic)
+	c.mu.Lock()
+	c.warm[topic] = warmEntry{seen: stale}
+	c.mu.Unlock()
+
+	warm := c.WarmURLs(context.Background())
+	if hasURL(warm, topic) {
+		t.Fatalf("abandoned topic feed still warm: %v", warm)
+	}
+	if !hasURL(warm, "https://seed.example/rss") {
+		t.Fatalf("curated seed must never decay: %v", warm)
+	}
+	c.mu.RLock()
+	n := len(c.warm)
+	c.mu.RUnlock()
+	if n != 0 {
+		t.Fatalf("in-mem demand tier kept %d expired entries", n)
+	}
+	// And the fleet-wide registry itself shrank — not just this pod's view of it.
+	if members, _ := mr.ZMembers(warmSetKey); len(members) != 0 {
+		t.Fatalf("shared registry still holds %v", members)
 	}
 }
 

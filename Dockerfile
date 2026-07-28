@@ -21,7 +21,11 @@
 #   YOUTUBE_API_KEY (live-video reliability; scrape fallback needs no key),
 #   FRED_API_KEY, FINNHUB_API_KEY, NASA_FIRMS_API_KEY, EIA_API_KEY,
 #   ACLED_ACCESS_TOKEN, CLOUDFLARE_API_TOKEN, WINGBITS_API_KEY, WS_RELAY_URL,
+#   X_BEARER_TOKEN, TIKTOK_ACCESS_TOKEN, LINKEDIN_ACCESS_TOKEN + LINKEDIN_ORG_URN
+#   (the credentialed social emitters),
 #   HANZO_AI_KEY (+ HANZO_AI_BASE / HANZO_AI_MODEL) for the AI endpoints.
+# The list world actually pulls lives in ONE place — worldSecretKeys
+# (internal/world/kms.go); this comment mirrors it.
 
 # ---- web stage: Vite static build (-> /app/dist) -------------------------
 # node:22 — package.json pins `packageManager: pnpm@11.17.0`, and corepack

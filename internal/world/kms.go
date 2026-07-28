@@ -72,6 +72,10 @@ var worldSecretKeys = []string{
 	"CLOUDFLARE_API_TOKEN",    // infra telemetry
 	"WINGBITS_API_KEY",        // ADS-B feed
 	"WS_RELAY_URL",            // live websocket relay
+	"X_BEARER_TOKEN",          // social: X recent-search (TWITTER_BEARER_TOKEN is its alias)
+	"TIKTOK_ACCESS_TOKEN",     // social: TikTok Research API
+	"LINKEDIN_ACCESS_TOKEN",   // social: LinkedIn REST
+	"LINKEDIN_ORG_URN",        // social: the org whose timeline LinkedIn returns
 }
 
 // kmsConfig is the resolved fetch scope. host has no trailing slash; path has
