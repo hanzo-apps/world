@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -222,10 +224,7 @@ func TestFetchKMSSecrets_ValueRoundTripAnd404Skip(t *testing.T) {
 // Every socialSource's canonical credential (the first alias — later ones are
 // resolved by env() at read time, never fetched) must therefore be listed.
 func TestWorldSecretKeysCoverSocialCredentials(t *testing.T) {
-	declared := make(map[string]bool, len(worldSecretKeys))
-	for _, k := range worldSecretKeys {
-		declared[k] = true
-	}
+	declared := declaredKMSKeys()
 	for name, src := range socialSources {
 		if !declared[src.creds[0]] {
 			t.Errorf("%s: %s missing from worldSecretKeys — KMS is never asked for it", name, src.creds[0])
@@ -234,4 +233,63 @@ func TestWorldSecretKeysCoverSocialCredentials(t *testing.T) {
 	if !declared["LINKEDIN_ORG_URN"] { // read directly by fetchLinkedInPosts, not via src.creds
 		t.Error("LINKEDIN_ORG_URN missing from worldSecretKeys — LinkedIn stays dark with a valid token")
 	}
+}
+
+// declaredKMSKeys is worldSecretKeys as a set: exactly what world GETs from KMS.
+func declaredKMSKeys() map[string]bool {
+	m := make(map[string]bool, len(worldSecretKeys))
+	for _, k := range worldSecretKeys {
+		m[k] = true
+	}
+	return m
+}
+
+// credentialRead matches a CREDENTIAL read from the environment: the FIRST
+// literal argument of env() (later ones are aliases, resolved at read time and
+// deliberately never fetched) whose name ends like a secret rather than like an
+// endpoint or a flag.
+var credentialRead = regexp.MustCompile(`\benv\("([A-Z0-9_]*(?:_KEY|_TOKEN|_SECRET|_PASSWORD|_URN))"`)
+
+// The social defect, guarded at its root instead of one platform at a time: a
+// credential this package reads but never declares is unprovisionable — the
+// operator puts it in hanzo/world-secrets, world never asks for it, and the
+// feature stays dark. KMS_* is excluded: those are what world logs in to KMS
+// WITH, so fetching them from KMS would be circular.
+func TestWorldSecretKeysCoverEveryCredentialRead(t *testing.T) {
+	declared, files, found := declaredKMSKeys(), goSourceFiles(t), 0
+	for _, name := range files {
+		src, err := os.ReadFile(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, m := range credentialRead.FindAllStringSubmatch(string(src), -1) {
+			key := m[1]
+			if strings.HasPrefix(key, "KMS_") {
+				continue
+			}
+			found++
+			if !declared[key] {
+				t.Errorf("%s reads %s, but worldSecretKeys never asks KMS for it", name, key)
+			}
+		}
+	}
+	if found == 0 {
+		t.Fatal("no credential reads found — the scan is broken, not the code")
+	}
+}
+
+// goSourceFiles lists the package's non-test sources (the handlers live here).
+func goSourceFiles(t *testing.T) []string {
+	t.Helper()
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []string
+	for _, e := range entries {
+		if n := e.Name(); strings.HasSuffix(n, ".go") && !strings.HasSuffix(n, "_test.go") {
+			out = append(out, n)
+		}
+	}
+	return out
 }
