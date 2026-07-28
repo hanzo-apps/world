@@ -70,7 +70,7 @@ WORKDIR /src
 # alpine ships neither, so add git and mount the gh_token BuildKit secret that
 # hanzoai/ci passes (--secret id=gh_token); the mount is a no-op for public builds.
 RUN apk add --no-cache git
-ENV GOPRIVATE=github.com/hanzoai,github.com/luxfi,github.com/zooai
+ENV GOPRIVATE=github.com/hanzoai,github.com/lux-private,github.com/zooai
 # Deps: hanzo-kv client (go-redis) + embedded SQLite (modernc). Download once for
 # a cached layer before the source is copied.
 COPY go.mod go.sum ./
