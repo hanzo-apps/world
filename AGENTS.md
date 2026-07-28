@@ -52,6 +52,20 @@ Order of preference for "look at / poke the UI": Hanzo MCP browser → Playwrigh
   never in git. Absent, each serves an empty channel and logs one skip line.
   A credential is only reachable if it is listed in `worldSecretKeys`
   (`internal/world/kms.go`) — that list IS what world asks KMS for.
+- NOT PROVISIONED (measured 2026-07-28, logged in as world's own KMS client):
+  `hanzo/world-secrets` does not exist and none of the 24 names are anywhere
+  under `hanzo/prod` — `world: KMS injected 0 secret(s) of 24 requested`. Every
+  credentialed source is therefore serving its keyless degradation, X / TikTok /
+  LinkedIn included. Storing the secrets is an operator action; no code change
+  will light them up.
+- Keyless does NOT mean free. A feed host budgets by IP and the whole fleet is
+  one egress IP. Reddit grants ~one anonymous request per window and says so on
+  every response (`x-ratelimit-remaining: 0.0`, `x-ratelimit-reset: 57`);
+  YouTube's `/feeds/videos.xml` soft-404s a busy IP per channel, with no header
+  to pace by, so its feeds fill in opportunistically over several warm cycles.
+  `fetchFeedBody` waits out whatever pause a host states (`hostGate`) and
+  `warmFeeds` walks host by host — parallel fetches of one host just become
+  429s. Adding feeds on a rate-limited host costs the ones already there.
 - A user topic is a `Monitor` (per-user SQLite, namespace `monitors`), not a
   separate store. `topicFeeds()` turns it into Feeds so it pulls; the seed list
   in `TOPIC_KEYWORDS` is only a default, unioned with the user's own topics.
