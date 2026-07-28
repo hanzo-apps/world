@@ -84,3 +84,18 @@ func TestBuildRSSEscapesUpstreamText(t *testing.T) {
 		t.Fatalf("escaped title did not round-trip: %+v", items)
 	}
 }
+
+// A dark platform is answered from cache like any other: the skip line is logged
+// once per TTL, not once per request (and a flapping upstream is not re-hit).
+func TestSocialCachesTheEmptyChannel(t *testing.T) {
+	for _, k := range []string{"X_BEARER_TOKEN", "TWITTER_BEARER_TOKEN"} {
+		t.Setenv(k, "")
+	}
+	s := NewServer()
+	if w := socialGet(t, s, "/v1/world/social/x?q=ai"); w.Code != http.StatusOK {
+		t.Fatalf("status %d, want 200", w.Code)
+	}
+	if _, hit := s.cache.Get("social:x:ai"); !hit {
+		t.Fatal("empty channel was not cached — every request re-runs the skip path")
+	}
+}

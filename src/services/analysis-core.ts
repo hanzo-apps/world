@@ -482,7 +482,9 @@ export function analyzeCorrelationsCore(
   const now = Date.now();
 
   // The suppression list filters generic seed terms out of trending noise; a topic
-  // the user typed is deliberate, so it is never suppressed.
+  // the user typed is deliberate, so it is never suppressed. Applied HERE and only
+  // here: every key of newsTopics is one of these keywords, so a second filter
+  // downstream could only ever fire on a user's own topic.
   const newsTopics = extractTopics(events, [...new Set([
     ...TOPIC_KEYWORDS.filter(kw => !SUPPRESSED_TRENDING_TERMS.has(kw)),
     ...topics,
@@ -554,7 +556,6 @@ export function analyzeCorrelationsCore(
 
   // Detect news velocity spikes
   for (const [topic, velocity] of newsTopics) {
-    if (SUPPRESSED_TRENDING_TERMS.has(topic)) continue;
     const baselineHistory = pruneVelocityHistory(previousHistory.get(topic) ?? [], now);
     const baseline = averageVelocity(baselineHistory);
     const exceedsAbsoluteThreshold = velocity > NEWS_VELOCITY_THRESHOLD * 2;

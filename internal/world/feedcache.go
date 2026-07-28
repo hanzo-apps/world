@@ -20,16 +20,19 @@ import (
 //	     by any pod's warmer is instantly available to every pod, and a restarted
 //	     pod repopulates L1 from L2 instead of cold-starting.
 //
-// The warm-URL set (which feeds to keep fresh) is demand-driven: any feed served
-// once is registered, persisted fleet-wide in hanzo-kv, and kept fresh by the
-// background warmer. A curated seed guarantees the highest-value panels are warm
-// even on a brand-new pod before the first request. When hanzo-kv is
-// unreachable, everything degrades to the in-mem tier — still correct, just
-// per-pod and cold across restart.
+// The warm-URL set (which feeds to keep fresh) is demand-driven and DECAYS: a
+// request registers demand (Want), the background warmer keeps every feed under
+// demand fresh, and demand nobody renews for warmTTL is forgotten. Decay is the
+// point — the frontend synthesizes a feed per user topic, so without it every
+// keyword anyone ever typed would be re-fetched by the fleet forever. A curated
+// seed guarantees the highest-value panels are warm even on a brand-new pod
+// before the first request. When hanzo-kv is unreachable, everything degrades to
+// the in-mem tier — still correct, just per-pod and cold across restart.
 type FeedCache struct {
 	mu   sync.RWMutex
-	mem  map[string]feedRow  // L1
-	warm map[string]struct{} // in-mem warm-set fallback when kv is down
+	mem  map[string]feedRow   // L1
+	warm map[string]warmEntry // in-mem demand tier (fallback when kv is down)
+	seed []string             // curated bootstrap feeds: warm on every pod, never decay
 	kv   *kv.Client
 	max  int
 }
@@ -39,41 +42,46 @@ type feedRow struct {
 	at   time.Time
 }
 
+// warmEntry is one URL's demand: when it was last asked for, and when that was
+// last published to the shared registry (a rate-limited write, see Want).
+type warmEntry struct{ seen, published time.Time }
+
 const (
-	// feedKeyPrefix / warmSetKey namespace the shared hanzo-kv keys.
+	// feedKeyPrefix / warmSetKey namespace the shared hanzo-kv keys. warmSetKey is
+	// a TIMESTAMPED set (score = last demand); v2 because v1 was a plain set —
+	// membership with no way to forget — and the two types cannot share a key.
 	feedKeyPrefix = "world:feed:v1:"
-	warmSetKey    = "world:feed:warm:v1"
+	warmSetKey    = "world:feed:warm:v2"
 	// feedKVTTL is the L2 safety horizon. The warmer refreshes every few minutes,
 	// so a live entry is normally far younger; the TTL only bounds abandoned feeds.
 	feedKVTTL = 3 * time.Hour
 	// defaultFeedCacheMax bounds the L1 mirror (news feeds are small; ~500 covers
 	// every frontend variant with room to spare).
 	defaultFeedCacheMax = 1024
+	// warmTTL is how long a feed keeps being warmed after the LAST request for it:
+	// long enough to span a quiet night, short enough that an abandoned topic feed
+	// stops costing the fleet a fetch every cycle.
+	warmTTL = 24 * time.Hour
+	// warmPublishEvery rate-limits the shared-tier write, so the instant read path
+	// costs at most one registry write per feed per interval.
+	warmPublishEvery = 5 * time.Minute
 )
 
-// NewFeedCache builds the cache over an (optional) hanzo-kv client, seeding the
-// warm set with the curated bootstrap feeds so a cold pod warms them first.
+// NewFeedCache builds the cache over an (optional) hanzo-kv client. The curated
+// seed is warm on every pod from boot and is deliberately NOT published to the
+// shared registry: it is compiled into every pod already, and the registry is
+// for demand — the thing that has to be able to decay.
 func NewFeedCache(kvc *kv.Client, max int, seed []string) *FeedCache {
 	if max <= 0 {
 		max = defaultFeedCacheMax
 	}
-	c := &FeedCache{
+	return &FeedCache{
 		mem:  make(map[string]feedRow),
-		warm: make(map[string]struct{}),
+		warm: make(map[string]warmEntry),
+		seed: seed,
 		kv:   kvc,
 		max:  max,
 	}
-	for _, u := range seed {
-		c.warm[u] = struct{}{}
-	}
-	// Publish the seed to the shared warm set too (best-effort), so every pod
-	// converges on the same fleet-wide set.
-	if len(seed) > 0 {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		c.kv.SAdd(ctx, warmSetKey, seed...)
-		cancel()
-	}
-	return c
 }
 
 // Get returns a cached feed body and its fetch time. L1 first (instant); on miss
@@ -95,21 +103,45 @@ func (c *FeedCache) Get(ctx context.Context, url string) ([]byte, time.Time, boo
 	return nil, time.Time{}, false
 }
 
-// Put write-throughs a freshly fetched body to both tiers and registers the URL
-// in the warm set (demand-driven). It uses a detached, bounded context for the
-// shared-tier writes so a write-through is never truncated by the request that
-// triggered it — durability must outlive the request. The fetch time is now.
+// Put write-throughs a freshly fetched body to both tiers. Body only: registering
+// demand is Want's job, and keeping the two apart is what lets demand decay — the
+// warmer writes through on every cycle, so a Put that also renewed demand would
+// keep every feed it ever fetched alive forever. It uses a detached, bounded
+// context for the shared-tier write so a write-through is never truncated by the
+// request that triggered it — durability must outlive the request. The fetch time
+// is now.
 func (c *FeedCache) Put(url string, body []byte) {
 	at := time.Now()
 	c.storeMem(url, body, at)
-	c.mu.Lock()
-	c.warm[url] = struct{}{}
-	c.mu.Unlock()
 	raw := encodeFeed(at, body)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	c.kv.SetBytes(ctx, feedKeyPrefix+url, raw, feedKVTTL)
-	c.kv.SAdd(ctx, warmSetKey, url)
+}
+
+// Want registers demand for a feed — the ONE way a URL enters the warm set. Every
+// request path calls it (cache hit or miss); the warmer never does. So a feed
+// stays warm exactly as long as someone is still asking for it: a topic feed a
+// user deleted (or typed once) ages out after warmTTL instead of being re-fetched
+// by the whole fleet forever. The shared write is rate-limited to keep the
+// instant read path instant.
+func (c *FeedCache) Want(url string) {
+	now := time.Now()
+	c.mu.Lock()
+	e := c.warm[url]
+	e.seen = now
+	publish := now.Sub(e.published) >= warmPublishEvery
+	if publish {
+		e.published = now
+	}
+	c.warm[url] = e
+	c.mu.Unlock()
+	if !publish {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	c.kv.ZAdd(ctx, warmSetKey, now, url)
 }
 
 // Age returns how old the cached copy is, if any (for the warmer's
@@ -121,21 +153,30 @@ func (c *FeedCache) Age(ctx context.Context, url string) (time.Duration, bool) {
 	return 0, false
 }
 
-// WarmURLs is the set of feeds to keep fresh: the fleet-wide set from hanzo-kv
-// unioned with the in-mem set (seed + demand). Deduped.
+// WarmURLs is the set of feeds to keep fresh: the curated seed plus every feed
+// still under demand — fleet-wide (hanzo-kv) unioned with this pod's own, deduped.
+// Demand older than warmTTL is forgotten in both tiers here, which is the only
+// thing that bounds either. L1 is deliberately NOT a source: it mirrors bodies,
+// not demand, and treating it as demand kept every feed ever fetched warm forever.
 func (c *FeedCache) WarmURLs(ctx context.Context) []string {
-	set := make(map[string]struct{})
-	for _, u := range c.kv.SMembers(ctx, warmSetKey) {
+	cutoff := time.Now().Add(-warmTTL)
+	c.kv.ZDropBefore(ctx, warmSetKey, cutoff)
+	set := make(map[string]struct{}, len(c.seed))
+	for _, u := range c.seed {
 		set[u] = struct{}{}
 	}
-	c.mu.RLock()
-	for u := range c.warm {
+	for _, u := range c.kv.ZSince(ctx, warmSetKey, cutoff) {
 		set[u] = struct{}{}
 	}
-	for u := range c.mem {
+	c.mu.Lock()
+	for u, e := range c.warm {
+		if e.seen.Before(cutoff) {
+			delete(c.warm, u)
+			continue
+		}
 		set[u] = struct{}{}
 	}
-	c.mu.RUnlock()
+	c.mu.Unlock()
 	out := make([]string, 0, len(set))
 	for u := range set {
 		out = append(out, u)

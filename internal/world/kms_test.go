@@ -215,3 +215,23 @@ func TestFetchKMSSecrets_ValueRoundTripAnd404Skip(t *testing.T) {
 		t.Fatalf("404 key must be skipped, but present: %q", got["FRED_API_KEY"])
 	}
 }
+
+// A credential world never asks KMS for is a credential that cannot be turned on:
+// fetchKMSSecrets only GETs cfg.keys, so a platform whose token is missing from
+// worldSecretKeys stays dark no matter what is stored under hanzo/world-secrets.
+// Every socialSource's canonical credential (the first alias — later ones are
+// resolved by env() at read time, never fetched) must therefore be listed.
+func TestWorldSecretKeysCoverSocialCredentials(t *testing.T) {
+	declared := make(map[string]bool, len(worldSecretKeys))
+	for _, k := range worldSecretKeys {
+		declared[k] = true
+	}
+	for name, src := range socialSources {
+		if !declared[src.creds[0]] {
+			t.Errorf("%s: %s missing from worldSecretKeys — KMS is never asked for it", name, src.creds[0])
+		}
+	}
+	if !declared["LINKEDIN_ORG_URN"] { // read directly by fetchLinkedInPosts, not via src.creds
+		t.Error("LINKEDIN_ORG_URN missing from worldSecretKeys — LinkedIn stays dark with a valid token")
+	}
+}

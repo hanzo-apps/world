@@ -69,7 +69,9 @@ func TestWarmerSkipsFreshFeeds(t *testing.T) {
 	feedURL, hits := stubFeed(t)
 	s := newTestServer(t)
 	s.feeds = NewFeedCache(kv.Open("", ""), 0, nil)
-	// Pre-warm: a fresh copy already in cache (age < freshWindow).
+	// Under demand (so it IS in the warm set) but with a fresh copy already in
+	// cache (age < freshWindow) — the warmer must skip it, not refetch it.
+	s.feeds.Want(feedURL)
 	s.feeds.Put(feedURL, []byte(stubRSS))
 
 	s.warmFeeds(context.Background())

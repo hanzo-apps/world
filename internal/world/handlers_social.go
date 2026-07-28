@@ -88,8 +88,11 @@ func (s *Server) handleSocial(w http.ResponseWriter, r *http.Request) {
 	}
 	body := buildRSS(src.title+" · "+q, src.home, src.title+" posts matching "+q,
 		"https://world.hanzo.ai/v1/world/social/"+name, items)
+	// The empty channel is cached like any other answer: a dark platform must cost
+	// one skip line per TTL, not one per request. A credential arriving later is
+	// picked up on the next miss.
+	s.cache.Set(key, body, 10*time.Minute, time.Hour)
 	if len(items) > 0 {
-		s.cache.Set(key, body, 10*time.Minute, time.Hour)
 		// A same-origin emitter never passes through rss-proxy, so THIS is where its
 		// items reach the lake — without it a monitor could never match them.
 		s.ingestFeedItems(src.home, body)
