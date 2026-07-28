@@ -54,6 +54,12 @@ type Server struct {
 	kv    *kv.Client
 	store *store.DB
 	feeds *FeedCache
+
+	// pace holds the per-host rate-limit budget every feed fetch draws on, and
+	// warming admits one warm cycle at a time (a paced host can outlast the
+	// interval). See hostGate and warmFeeds.
+	pace    *hostGate
+	warming sync.Mutex
 }
 
 // NewServer constructs the backend, its world-model engine (built from the feed
@@ -66,6 +72,7 @@ func NewServer() *Server {
 		flight: newFlightGroup(),
 		ai:     newAIClient(),
 		mcp:    mcp.New(),
+		pace:   newHostGate(),
 	}
 	s.worldModel = model.New(s.modelSources(), modelDataDir(), modelInterval())
 	// The fund brain is paper-only by construction: NewPaperBroker is the sole

@@ -19,12 +19,30 @@ var rssFetchHeaders = map[string]string{
 	"Accept":     "application/rss+xml, application/xml, text/xml, */*",
 }
 
+// feedFetchTimeout bounds one upstream HTTP call. It is deliberately separate
+// from the caller's ctx, which also has to cover waiting for the host's turn.
+const feedFetchTimeout = 10 * time.Second
+
 // fetchFeedBody performs one bounded, allowlisted GET of a feed and returns the
 // body only when it is a usable (non-blank) 2xx. This is the ONLY live-fetch
-// path for feed bodies, shared by the request fall-through and the warmer. The
-// caller owns the timeout via ctx.
+// path for feed bodies, shared by the request fall-through and the warmer — so
+// it is also where both draw on one per-host rate-limit budget (see hostGate)
+// instead of spending it against each other.
+//
+// The caller owns the total budget via ctx, which covers QUEUEING as well as the
+// request: the warmer hands over a whole cycle and can wait out a host's window,
+// while a user request hands over its own short deadline and degrades to the
+// cached copy rather than hanging. feedFetchTimeout bounds the HTTP call itself
+// inside whatever remains.
 func (s *Server) fetchFeedBody(ctx context.Context, feedURL string) ([]byte, bool) {
-	body, status, err := s.getAllowlisted(ctx, feedURL, allowedRSSDomains, rssFetchHeaders)
+	release, ok := s.pace.enter(ctx, feedHost(feedURL))
+	if !ok {
+		return nil, false // ctx expired waiting our turn
+	}
+	rctx, cancel := context.WithTimeout(ctx, feedFetchTimeout)
+	defer cancel()
+	body, status, hdr, err := s.getAllowlisted(rctx, feedURL, allowedRSSDomains, rssFetchHeaders)
+	release(hdr)
 	if err != nil || status < 200 || status >= 300 || isBlankBody(body) {
 		return nil, false
 	}
