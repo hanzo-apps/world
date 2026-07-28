@@ -46,6 +46,11 @@ COPY . .
 # is same-origin, resolved in the browser).
 ARG VITE_MAPBOX_TOKEN
 ENV VITE_MAPBOX_TOKEN=$VITE_MAPBOX_TOKEN
+# The version the builder is CUTTING, so the bundle self-reports the tag it ships
+# under. release.yml is the one place a release number is decided; package.json is
+# only the local-dev fallback (see the __APP_VERSION__ note in vite.config.ts).
+ARG APP_VERSION
+ENV APP_VERSION=$APP_VERSION
 RUN pnpm build
 # The @hanzo/gui (Tamagui) React rewrite, built to /app/dist-react as the opt-in
 # canary surface. Served only to sessions that pass ?react (see cmd/world:
