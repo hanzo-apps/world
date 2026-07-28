@@ -139,6 +139,7 @@ func (s *Server) handleFeedsBatch(w http.ResponseWriter, r *http.Request) {
 // live fetch (so the caller folds it into the lake exactly once). The warm cache
 // is the same one handleRSSProxy reads, so either path warms the other.
 func (s *Server) feedXML(ctx context.Context, feedURL string) (body []byte, ok, fresh bool) {
+	s.feeds.Want(feedURL) // asking for it is what keeps it warm (see FeedCache.Want)
 	if b, _, hit := s.feeds.Get(ctx, feedURL); hit {
 		return b, true, false // any cached copy → serve instantly (stale-while-revalidate)
 	}

@@ -14,6 +14,7 @@ package kv
 
 import (
 	"context"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -92,31 +93,51 @@ func (c *Client) SetBytes(ctx context.Context, key string, val []byte, ttl time.
 	}
 }
 
-// SAdd adds members to a set (the fleet-wide warm-URL registry). Best-effort.
-func (c *Client) SAdd(ctx context.Context, key string, members ...string) {
+// ── Timestamped set (sorted set, score = unix seconds) ───────────────────────
+//
+// The fleet-wide warm-URL registry. A plain set would grow forever — a member
+// added once is a member for good — so membership carries the time it was last
+// renewed, and the reader takes only what is still inside its window.
+
+// ZAdd adds/renews members with score = at. Best-effort.
+func (c *Client) ZAdd(ctx context.Context, key string, at time.Time, members ...string) {
 	if !c.available() || len(members) == 0 {
 		return
 	}
-	vals := make([]any, len(members))
+	zs := make([]kv.Z, len(members))
 	for i, m := range members {
-		vals[i] = m
+		zs[i] = kv.Z{Score: float64(at.Unix()), Member: m}
 	}
-	if err := c.r.SAdd(ctx, key, vals...).Err(); err != nil {
+	if err := c.r.ZAdd(ctx, key, zs...).Err(); err != nil {
 		c.trip()
 	}
 }
 
-// SMembers returns the set members, or nil on miss/failure.
-func (c *Client) SMembers(ctx context.Context, key string) []string {
+// ZSince returns the members renewed at or after since, or nil on miss/failure.
+func (c *Client) ZSince(ctx context.Context, key string, since time.Time) []string {
 	if !c.available() {
 		return nil
 	}
-	v, err := c.r.SMembers(ctx, key).Result()
+	v, err := c.r.ZRangeByScore(ctx, key, &kv.ZRangeBy{
+		Min: strconv.FormatInt(since.Unix(), 10),
+		Max: "+inf",
+	}).Result()
 	if err != nil {
 		c.trip()
 		return nil
 	}
 	return v
+}
+
+// ZDropBefore forgets members not renewed since cutoff — the only thing that
+// bounds the set's size. Best-effort.
+func (c *Client) ZDropBefore(ctx context.Context, key string, cutoff time.Time) {
+	if !c.available() {
+		return
+	}
+	if err := c.r.ZRemRangeByScore(ctx, key, "-inf", "("+strconv.FormatInt(cutoff.Unix(), 10)).Err(); err != nil {
+		c.trip()
+	}
 }
 
 // Ping checks reachability (used once at boot to log status). Returns an error

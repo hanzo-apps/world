@@ -182,6 +182,9 @@ func (s *Server) handleRSSProxy(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "Domain not allowed")
 		return
 	}
+	// A served request IS the demand signal that keeps this feed in the warm set;
+	// stop asking and it ages out (see FeedCache.Want).
+	s.feeds.Want(feedURL)
 	const cc = "public, max-age=300, s-maxage=300, stale-while-revalidate=60"
 	// Warm cache first (per-pod L1 → shared hanzo-kv L2): instant, and never blocks
 	// on the upstream while ANY cached copy exists (stale-while-revalidate; the

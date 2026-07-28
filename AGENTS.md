@@ -50,9 +50,17 @@ Order of preference for "look at / poke the UI": Hanzo MCP browser → Playwrigh
   `X_BEARER_TOKEN` (or `TWITTER_BEARER_TOKEN`), `TIKTOK_ACCESS_TOKEN`,
   `LINKEDIN_ACCESS_TOKEN` + `LINKEDIN_ORG_URN` — from KMS `hanzo/world-secrets`,
   never in git. Absent, each serves an empty channel and logs one skip line.
+  A credential is only reachable if it is listed in `worldSecretKeys`
+  (`internal/world/kms.go`) — that list IS what world asks KMS for.
 - A user topic is a `Monitor` (per-user SQLite, namespace `monitors`), not a
   separate store. `topicFeeds()` turns it into Feeds so it pulls; the seed list
   in `TOPIC_KEYWORDS` is only a default, unioned with the user's own topics.
+  Trending-noise suppression applies to that seed and only there — a term the
+  user typed is deliberate and always signals.
+- Warming is demand-driven and decays: a request calls `FeedCache.Want`, the
+  warmer refreshes what is wanted, and demand nobody renews within `warmTTL`
+  is dropped. `Put` writes bodies, never demand — otherwise the warmer would
+  renew its own work and every topic anyone ever typed would be fetched forever.
 
 ## Release
 
