@@ -244,7 +244,15 @@ function youtubeLivePlugin(): Plugin {
 
 export default defineConfig({
   define: {
-    __APP_VERSION__: JSON.stringify(pkg.version),
+    // THE released version comes from .hanzo/workflows/release.yml, which computes
+    // it monotonically over the 2.4.x line from git tags + already-pushed image
+    // tags — it never reads package.json and never writes it back. So package.json
+    // is a *dev* fallback, not the release: main says 2.4.59 while the image cut
+    // from that very commit is 2.4.60. __APP_VERSION__ keys the chunk-reload guard
+    // (src/main.ts), i.e. it is how a browser notices a deploy and drops its stale
+    // chunk cache — pin it to package.json and N consecutive releases share one key
+    // and the guard silently stops firing. The builder passes the number it cut.
+    __APP_VERSION__: JSON.stringify(process.env.APP_VERSION || pkg.version),
   },
   plugins: [
     htmlVariantPlugin(),
