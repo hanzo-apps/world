@@ -53,13 +53,17 @@ const (
 // var, not a const, so tests can shrink it to exercise the degrade path.
 var kmsBootTimeout = 5 * time.Second
 
-// worldSecretKeys is the canonical set of secrets world pulls from KMS. It is
-// the union of every credential env() reads across the handlers (see the
-// Dockerfile's KMS-injected list). Aliases such as YT_API_KEY / FIRMS_API_KEY
-// are resolved by env() at read time and are NOT fetched — only the canonical
-// name is stored in KMS. A key absent from KMS simply 404s and is skipped.
+// worldSecretKeys is the canonical set of secrets world pulls from KMS: the
+// union of every credential env() reads anywhere in world, and the ONLY list —
+// a credential missing here cannot be turned on at all, no matter what is stored
+// under hanzo/world-secrets, because fetchKMSSecrets GETs exactly these names.
+// Aliases such as YT_API_KEY / FIRMS_API_KEY / TWITTER_BEARER_TOKEN are resolved
+// by env() at read time and are NOT fetched — only the canonical name (the first
+// alias at the call site) is stored in KMS. A key absent from KMS simply 404s
+// and is skipped.
 var worldSecretKeys = []string{
 	"HANZO_CLOUD_PULSE_TOKEN", // cloud-map pulse backend service token
+	"HANZO_KV_PASSWORD",       // hanzo-kv auth (unset today; read at boot, after this)
 	"HANZO_AI_KEY",            // AI endpoints (gateway key)
 	"HANZO_AI_BASE",           // AI gateway base URL override
 	"HANZO_AI_MODEL",          // AI default model override
@@ -71,6 +75,12 @@ var worldSecretKeys = []string{
 	"ACLED_ACCESS_TOKEN",      // conflict / risk events
 	"CLOUDFLARE_API_TOKEN",    // infra telemetry
 	"WINGBITS_API_KEY",        // ADS-B feed
+	"OPENSKY_CLIENT_ID",       // flights: OpenSky OAuth2 client
+	"OPENSKY_CLIENT_SECRET",   // flights: OpenSky OAuth2 secret
+	"QUIVER_API_KEY",          // congressional trading (QUIVERQUANT_API_KEY is its alias)
+	"URLHAUS_AUTH_KEY",        // cyber: URLhaus malware URLs
+	"OTX_API_KEY",             // cyber: AlienVault OTX pulses
+	"ABUSEIPDB_API_KEY",       // cyber: IP reputation
 	"WS_RELAY_URL",            // live websocket relay
 	"X_BEARER_TOKEN",          // social: X recent-search (TWITTER_BEARER_TOKEN is its alias)
 	"TIKTOK_ACCESS_TOKEN",     // social: TikTok Research API
