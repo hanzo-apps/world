@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Platform user metrics — REAL signups / active users from Hanzo IAM (Casdoor).
+// Platform user metrics — REAL signups / active users from Hanzo IAM.
 //
 // Source: IAM GET /v1/iam/global-users (every user across every org; global-admin
 // only). We read it with the signed-in admin's OWN bearer (never a shared key),
@@ -22,7 +22,7 @@ type userMetrics struct {
 	SignupSeries []int64 `json:"signupSeries"` // new users/day, last 14 days, chronological
 }
 
-// iamUser is the minimal, non-PII slice of Casdoor's object.User we read.
+// iamUser is the minimal, non-PII slice of IAM's user object we read.
 type iamUser struct {
 	CreatedTime string `json:"createdTime"`
 	IsOnline    bool   `json:"isOnline"`
@@ -72,7 +72,7 @@ func (s *Server) fetchUserMetrics(ctx context.Context, auth map[string]string) (
 	return m, nil
 }
 
-// parseUserTime parses Casdoor's createdTime (RFC3339, with a couple of legacy
+// parseUserTime parses IAM's createdTime (RFC3339, with a couple of legacy
 // fallbacks). ok=false when unparseable so a bad row is skipped, never guessed.
 func parseUserTime(s string) (time.Time, bool) {
 	for _, layout := range []string{time.RFC3339, time.RFC3339Nano, "2006-01-02 15:04:05"} {
