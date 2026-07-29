@@ -64,7 +64,7 @@ const K = {
   org: 'hanzo_iam_org',     // active tenant org (blank/absent => home org)
 } as const;
 
-// IAM (Casdoor) API — verb paths, served from the same issuer as OIDC. Used to
+// IAM API — verb paths, served from the same issuer as OIDC. Used to
 // list the orgs a user belongs to (self-scoped for a normal token; all orgs for
 // a global admin). Projects live under org-scope, one call away.
 const IAM_API = {
@@ -308,9 +308,9 @@ export async function logout(): Promise<void> {
 // user always resolves to their own org; only a global admin crosses orgs.
 
 export interface OrgInfo {
-  name: string;        // canonical org id (Casdoor org name)
+  name: string;        // canonical org id (IAM org name)
   displayName: string; // human label
-  logo?: string;       // org logo URL (Casdoor `logo`); undefined when unset
+  logo?: string;       // org logo URL (IAM `logo`); undefined when unset
 }
 
 let cachedOrgs: OrgInfo[] | null = null;

@@ -26,9 +26,9 @@ export interface Project {
 }
 
 export interface OrgOption {
-  id: string;    // canonical org id (Casdoor org name)
+  id: string;    // canonical org id (IAM org name)
   name: string;  // human label (displayName)
-  logo?: string; // org logo URL (Casdoor `logo`); undefined when unset
+  logo?: string; // org logo URL (IAM `logo`); undefined when unset
 }
 
 export interface OrgScope {
