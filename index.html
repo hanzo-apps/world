@@ -95,6 +95,16 @@
 
     <!-- Styles -->
     <link rel="stylesheet" href="/src/styles/main.css" />
+
+    <!-- Hanzo Edit: the ensō ring in the corner, and the session recording behind
+         it. One line, identical on every Hanzo property — the widget resolves this
+         host to its repo from its own map, so no meta is required here; the one
+         below is the explicit declaration that outranks it. Replay rides the same
+         tag (rrweb → insights.hanzo.ai), which is why HANZO_STATIC_CSP for this
+         app has to allow hanzo.app and insights.hanzo.ai. See hanzoai/app
+         HANZO_EDIT.md. -->
+    <meta name="hanzo:repo" content="hanzoai/world" />
+    <script async src="https://hanzo.app/edit.js"></script>
   </head>
   <body>
     <div id="app"></div>
