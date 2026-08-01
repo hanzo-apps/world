@@ -63,7 +63,7 @@ RUN pnpm build:react
 # pure-Go engine (zero modernc.org/* in the module graph). That engine gates FTS5
 # behind the `sqlite_fts5` build tag, which the store's items_fts virtual table
 # needs — so the build below MUST carry `-tags sqlite_fts5` or Open degrades.
-FROM golang:1.26-alpine AS gobuild
+FROM golang:1.26.5-alpine AS gobuild
 WORKDIR /src
 # git: go resolves the PRIVATE indirect dep github.com/hanzoai/csqlite 'direct'
 # (not via the module proxy), which needs the git binary + an https credential.
