@@ -405,17 +405,19 @@ export default defineConfig({
   // cold-start dev server and the globe e2e are deterministic. Prod is unaffected
   // (a production build bundles with Rollup and never runs the dep optimizer).
   optimizeDeps: {
+    // Every name here must be a declared dependency, or Vite logs "Failed to
+    // resolve dependency" on each dev start and prebundles nothing. The umbrella
+    // 'deck.gl' is not installed (this app imports the @deck.gl/* scoped packages
+    // directly), and @luma.gl/core + @luma.gl/webgl are transitive under pnpm's
+    // strict layout, so none of the three ever resolved from the project root.
     include: [
-      'deck.gl',
       '@deck.gl/core',
       '@deck.gl/layers',
       '@deck.gl/geo-layers',
       '@deck.gl/mesh-layers',
       '@deck.gl/aggregation-layers',
       '@deck.gl/mapbox',
-      '@luma.gl/core',
       '@luma.gl/engine',
-      '@luma.gl/webgl',
       'mapbox-gl',
     ],
   },
