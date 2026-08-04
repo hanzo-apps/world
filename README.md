@@ -1111,7 +1111,7 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ## Authors
 
-**Hanzo World** is maintained by **Hanzo AI, Inc.** — fork of the original **World Monitor** by **Elie Habib** ([GitHub](https://github.com/koala73)), used under the MIT License. See [NOTICE](./NOTICE).
+**Hanzo World** is maintained by **Hanzo AI, Inc.** Upstream attribution is recorded in [NOTICE](./NOTICE).
 
 ---
 
