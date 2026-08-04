@@ -298,8 +298,6 @@ body.animations-paused *::after {
 
 /* Map and canvas elements manage their own rendering */
 canvas,
-.maplibregl-map,
-.maplibregl-canvas,
 .mapboxgl-map,
 .mapboxgl-canvas,
 .deck-canvas {
@@ -12204,30 +12202,23 @@ a.prediction-link:hover {
   font-weight: 600;
 }
 
-/* mapbox-gl (and legacy maplibre) GL overrides for dark theme */
-.maplibregl-map,
+/* mapbox-gl GL overrides for dark theme */
 .mapboxgl-map {
   font-family: inherit;
   background: transparent !important;
 }
 
-.maplibregl-canvas-container,
-.maplibregl-canvas,
 .mapboxgl-canvas-container,
 .mapboxgl-canvas {
   background: transparent !important;
 }
 
 /* Override GL default grab cursor - use default pointer */
-.maplibregl-canvas-container.maplibregl-interactive,
-.maplibregl-canvas-container.maplibregl-interactive .maplibregl-canvas,
 .mapboxgl-canvas-container.mapboxgl-interactive,
 .mapboxgl-canvas-container.mapboxgl-interactive .mapboxgl-canvas {
   cursor: default !important;
 }
 
-.maplibregl-canvas-container.maplibregl-interactive:active,
-.maplibregl-canvas-container.maplibregl-interactive:active .maplibregl-canvas,
 .mapboxgl-canvas-container.mapboxgl-interactive:active,
 .mapboxgl-canvas-container.mapboxgl-interactive:active .mapboxgl-canvas {
   cursor: grabbing !important;
@@ -12250,7 +12241,6 @@ a.prediction-link:hover {
   cursor: grabbing !important;
 }
 
-.maplibregl-popup-content,
 .mapboxgl-popup-content {
   background: var(--bg);
   color: var(--text);
@@ -12260,19 +12250,16 @@ a.prediction-link:hover {
   font-size: 11px;
 }
 
-.maplibregl-popup-tip,
 .mapboxgl-popup-tip {
   border-top-color: var(--bg);
 }
 
-.maplibregl-ctrl-attrib,
 .mapboxgl-ctrl-attrib {
   background: var(--bg) !important;
   color: var(--text-dim) !important;
   font-size: 9px !important;
 }
 
-.maplibregl-ctrl-attrib a,
 .mapboxgl-ctrl-attrib a {
   color: var(--text-dim) !important;
 }
@@ -12280,14 +12267,12 @@ a.prediction-link:hover {
 /* Hide the GL navigation controls (we use our own zoom/home buttons). The basemap
    LOGO stays (bottom-left) and a COMPACT attribution "ⓘ" stays (bottom-right) so
    basemap ToS is satisfied by default. */
-.maplibregl-ctrl-top-right,
 .mapboxgl-ctrl-top-right {
   display: none;
 }
 /* Keep the bottom-right compact attribution, but suppress any nav button groups
    GL might place there. */
-.mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-group,
-.maplibregl-ctrl-bottom-right .maplibregl-ctrl-group {
+.mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-group {
   display: none;
 }
 
@@ -12295,8 +12280,7 @@ a.prediction-link:hover {
    The compact "ⓘ" attribution above remains reachable, so basemap ToS still holds.
    Higher specificity + !important beats mapbox-gl's own injected stylesheet, which
    otherwise re-shows the logo (its rule loads after main.css). */
-body.hide-maplogo .mapboxgl-ctrl-logo,
-body.hide-maplogo .maplibregl-ctrl-logo {
+body.hide-maplogo .mapboxgl-ctrl-logo {
   display: none !important;
 }
 
@@ -15669,139 +15653,6 @@ body.has-critical-banner .panels-grid {
   }
 }
 
-/* ============================================================
-   Community Discussion Widget — Floating Pill
-   ============================================================ */
-.community-widget {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  z-index: 9000;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  animation: cw-float-in 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.community-widget.cw-hiding {
-  animation: cw-float-out 0.3s ease-in forwards;
-}
-
-@keyframes cw-float-in {
-  0% {
-    transform: translateY(10px) scale(0.95);
-    opacity: 0;
-  }
-
-  100% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-}
-
-@keyframes cw-float-out {
-  0% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-
-  100% {
-    transform: translateY(10px) scale(0.95);
-    opacity: 0;
-  }
-}
-
-.cw-pill {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--panel-bg, #141414);
-  border: 1px solid var(--border, #2a2a2a);
-  border-radius: 28px;
-  padding: 8px 8px 8px 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-}
-
-.cw-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: hsl(229, 48%, 55%);
-  flex-shrink: 0;
-  animation: cw-dot-pulse 2s ease-in-out infinite;
-}
-
-@keyframes cw-dot-pulse {
-
-  0%,
-  100% {
-    opacity: 1;
-    box-shadow: 0 0 0 0 hsla(229, 48%, 55%, 0.4);
-  }
-
-  50% {
-    opacity: 0.6;
-    box-shadow: 0 0 8px 2px hsla(229, 48%, 55%, 0.3);
-  }
-}
-
-.cw-text {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text, #e8e8e8);
-  white-space: nowrap;
-}
-
-.cw-cta {
-  padding: 6px 14px;
-  background: hsl(229, 48%, 55%);
-  border: none;
-  border-radius: 20px;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  white-space: nowrap;
-  transition: background 0.2s;
-}
-
-.cw-cta:hover {
-  background: hsl(229, 48%, 62%);
-}
-
-.cw-close {
-  background: none;
-  border: none;
-  color: var(--text-ghost, #444);
-  font-size: 16px;
-  cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  line-height: 1;
-  transition: color 0.15s, background 0.15s;
-}
-
-.cw-close:hover {
-  color: var(--text-dim, #888);
-  background: var(--overlay-light, rgba(255, 255, 255, 0.05));
-}
-
-.cw-dismiss {
-  font-size: 10px;
-  color: var(--text-ghost, #444);
-  cursor: pointer;
-  background: none;
-  border: none;
-  padding: 0 8px;
-  transition: color 0.2s;
-}
-
-.cw-dismiss:hover {
-  color: var(--text-dim, #888);
-}
 
 
 /* ── Live-value flash + motion polish (Hanzo) ──────────────────────────── */

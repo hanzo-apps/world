@@ -227,17 +227,6 @@
       "dontShowAgain": "Non mostrare più",
       "gotIt": "Fatto"
     },
-    "downloadBanner": {
-      "title": "Tavolo disponibile",
-      "description": "Prestazioni native, archiviazione sicura delle chiavi locali, riquadri della mappa offline.",
-      "macSilicon": "macOS (Apple Silicon)",
-      "macIntel": "macOS (Intel)",
-      "windows": "Windows (.exe)",
-      "linux": "Linux (.AppImage)",
-      "dismiss": "Congedare",
-      "showAllPlatforms": "Mostra tutte le piattaforme",
-      "showLess": "Mostra meno"
-    },
     "runtimeConfig": {
       "title": "Configurazione del desktop",
       "alertTitle": {
@@ -637,11 +626,6 @@
       "datacenter": "Centro dati",
       "base": "Base",
       "nuclear": "Nucleare"
-    },
-    "community": {
-      "joinDiscussion": "Unisciti alla discussione",
-      "openDiscussion": "Apri discussione",
-      "dontShowAgain": "Non mostrare più"
     },
     "threatLabels": {
       "critical": "CRIT",

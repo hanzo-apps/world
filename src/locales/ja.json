@@ -227,17 +227,6 @@
       "dontShowAgain": "今後表示しない",
       "gotIt": "了解"
     },
-    "downloadBanner": {
-      "title": "デスクトップ版あり",
-      "description": "ネイティブパフォーマンス、安全なローカルキー保存、オフラインマップタイル。",
-      "macSilicon": "macOS (Apple Silicon)",
-      "macIntel": "macOS (Intel)",
-      "windows": "Windows (.exe)",
-      "linux": "Linux (.AppImage)",
-      "showAllPlatforms": "全プラットフォームを表示",
-      "showLess": "折りたたむ",
-      "dismiss": "閉じる"
-    },
     "runtimeConfig": {
       "title": "デスクトップ設定",
       "alertTitle": {
@@ -521,11 +510,6 @@
       "datacenter": "データセンター",
       "base": "基地",
       "nuclear": "核施設"
-    },
-    "community": {
-      "joinDiscussion": "ディスカッションに参加",
-      "openDiscussion": "ディスカッションを開く",
-      "dontShowAgain": "今後表示しない"
     },
     "threatLabels": {
       "critical": "危険",

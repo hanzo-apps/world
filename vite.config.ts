@@ -441,7 +441,7 @@ export default defineConfig({
             if (id.includes('/@xenova/transformers/') || id.includes('/onnxruntime-web/')) {
               return 'ml';
             }
-            if (id.includes('/@deck.gl/') || id.includes('/mapbox-gl/') || id.includes('/maplibre-gl/') || id.includes('/h3-js/')) {
+            if (id.includes('/@deck.gl/') || id.includes('/mapbox-gl/') || id.includes('/h3-js/')) {
               return 'map';
             }
             if (id.includes('/d3/')) {

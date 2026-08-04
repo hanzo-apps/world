@@ -227,17 +227,6 @@
       "dontShowAgain": "لا تعرض مجدداً",
       "gotIt": "حسناً"
     },
-    "downloadBanner": {
-      "title": "تطبيق سطح المكتب متاح",
-      "description": "أداء أصلي، تخزين آمن للمفاتيح محلياً، خرائط غير متصلة.",
-      "macSilicon": "macOS (Apple Silicon)",
-      "macIntel": "macOS (Intel)",
-      "windows": "Windows (.exe)",
-      "linux": "Linux (.AppImage)",
-      "showAllPlatforms": "عرض جميع المنصات",
-      "showLess": "عرض أقل",
-      "dismiss": "تجاهل"
-    },
     "runtimeConfig": {
       "title": "تهيئة سطح المكتب",
       "alertTitle": {
@@ -521,11 +510,6 @@
       "datacenter": "مركز بيانات",
       "base": "قاعدة",
       "nuclear": "نووي"
-    },
-    "community": {
-      "joinDiscussion": "انضم إلى النقاش",
-      "openDiscussion": "فتح النقاش",
-      "dontShowAgain": "عدم العرض مجدداً"
     },
     "threatLabels": {
       "critical": "حرج",

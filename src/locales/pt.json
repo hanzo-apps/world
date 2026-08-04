@@ -144,17 +144,6 @@
       "dontShowAgain": "Não mostre novamente",
       "gotIt": "Entendi"
     },
-    "downloadBanner": {
-      "title": "Área de trabalho disponível",
-      "description": "Desempenho nativo, armazenamento seguro de chaves locais, blocos de mapas off-line.",
-      "macSilicon": "macOS (Apple Silicon)",
-      "macIntel": "macOS (Intel)",
-      "windows": "Windows (.exe)",
-      "linux": "Linux (.AppImage)",
-      "dismiss": "Liberar",
-      "showAllPlatforms": "Mostrar todas as plataformas",
-      "showLess": "Mostrar menos"
-    },
     "runtimeConfig": {
       "title": "Configuração da área de trabalho",
       "alertTitle": {
@@ -507,11 +496,6 @@
       "datacenter": "Datacenter",
       "base": "Base",
       "nuclear": "Nuclear"
-    },
-    "community": {
-      "joinDiscussion": "Junte-se à discussão",
-      "openDiscussion": "Abrir discussão",
-      "dontShowAgain": "Não mostrar novamente"
     },
     "threatLabels": {
       "critical": "CRÍT",

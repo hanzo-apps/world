@@ -234,17 +234,6 @@
       "dontShowAgain": "Don't show again",
       "gotIt": "Got it"
     },
-    "downloadBanner": {
-      "title": "Desktop Available",
-      "description": "Native performance, secure local key storage, offline map tiles.",
-      "macSilicon": "macOS (Apple Silicon)",
-      "macIntel": "macOS (Intel)",
-      "windows": "Windows (.exe)",
-      "linux": "Linux (.AppImage)",
-      "showAllPlatforms": "Show all platforms",
-      "showLess": "Show less",
-      "dismiss": "Dismiss"
-    },
     "runtimeConfig": {
       "title": "Desktop Configuration",
       "alertTitle": {
@@ -541,11 +530,6 @@
       "datacenter": "Datacenter",
       "base": "Base",
       "nuclear": "Nuclear"
-    },
-    "community": {
-      "joinDiscussion": "Join the Discussion",
-      "openDiscussion": "Open Discussion",
-      "dontShowAgain": "Don't show again"
     },
     "threatLabels": {
       "critical": "CRIT",
