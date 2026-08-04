@@ -227,17 +227,6 @@
       "dontShowAgain": "Nie pokazuj więcej",
       "gotIt": "Rozumiem"
     },
-    "downloadBanner": {
-      "title": "Dostępny komputer stacjonarny",
-      "description": "Natywna wydajność, bezpieczne lokalne przechowywanie kluczy, kafelki map offline.",
-      "macSilicon": "macOS (Apple Silicon)",
-      "macIntel": "macOS (Intel)",
-      "windows": "Windows (.exe)",
-      "linux": "Linux (.AppImage)",
-      "dismiss": "Odrzucać",
-      "showAllPlatforms": "Pokaż wszystkie platformy",
-      "showLess": "Pokaż mniej"
-    },
     "runtimeConfig": {
       "title": "Konfiguracja pulpitu",
       "alertTitle": {
@@ -637,11 +626,6 @@
       "datacenter": "Centrum danych",
       "base": "Baza",
       "nuclear": "Obiekt jądrowy"
-    },
-    "community": {
-      "joinDiscussion": "Dołącz do dyskusji",
-      "openDiscussion": "Otwórz dyskusję",
-      "dontShowAgain": "Nie pokazuj ponownie"
     },
     "threatLabels": {
       "critical": "KRYT",

@@ -227,17 +227,6 @@
       "dontShowAgain": "Nicht mehr anzeigen",
       "gotIt": "Habe es"
     },
-    "downloadBanner": {
-      "title": "Desktop verfügbar",
-      "description": "Native Leistung, sichere lokale Schlüsselspeicherung, Offline-Kartenkacheln.",
-      "macSilicon": "macOS (Apple Silicon)",
-      "macIntel": "macOS (Intel)",
-      "windows": "Windows (.exe)",
-      "linux": "Linux (.AppImage)",
-      "dismiss": "Zurückweisen",
-      "showAllPlatforms": "Alle Plattformen anzeigen",
-      "showLess": "Weniger anzeigen"
-    },
     "runtimeConfig": {
       "title": "Desktop-Konfiguration",
       "alertTitle": {
@@ -637,11 +626,6 @@
       "datacenter": "Rechenzentrum",
       "base": "Basis",
       "nuclear": "Nuklear"
-    },
-    "community": {
-      "joinDiscussion": "An der Diskussion teilnehmen",
-      "openDiscussion": "Diskussion öffnen",
-      "dontShowAgain": "Nicht mehr anzeigen"
     },
     "threatLabels": {
       "critical": "KRIT",

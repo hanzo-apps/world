@@ -144,17 +144,6 @@
       "dontShowAgain": "Niet meer laten zien",
       "gotIt": "Ik heb het"
     },
-    "downloadBanner": {
-      "title": "Bureaublad beschikbaar",
-      "description": "Native prestaties, veilige lokale sleutelopslag, offline kaarttegels.",
-      "macSilicon": "macOS (Apple Silicon)",
-      "macIntel": "macOS (Intel)",
-      "windows": "Windows (.exe)",
-      "linux": "Linux (.AppImage)",
-      "dismiss": "Afwijzen",
-      "showAllPlatforms": "Toon alle platforms",
-      "showLess": "Laat minder zien"
-    },
     "runtimeConfig": {
       "title": "Desktopconfiguratie",
       "alertTitle": {
@@ -507,11 +496,6 @@
       "datacenter": "Datacentrum",
       "base": "Basis",
       "nuclear": "Nucleair"
-    },
-    "community": {
-      "joinDiscussion": "Doe mee aan de discussie",
-      "openDiscussion": "Open discussie",
-      "dontShowAgain": "Niet meer tonen"
     },
     "threatLabels": {
       "critical": "KRIT",

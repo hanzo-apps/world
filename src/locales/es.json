@@ -227,17 +227,6 @@
       "dontShowAgain": "No volver a mostrar",
       "gotIt": "Entiendo"
     },
-    "downloadBanner": {
-      "title": "Escritorio disponible",
-      "description": "Rendimiento nativo, almacenamiento de claves local seguro, mosaicos de mapas sin conexión.",
-      "macSilicon": "macOS (Apple Silicio)",
-      "macIntel": "MacOS (Intel)",
-      "windows": "Windows (.exe)",
-      "linux": "Linux (.AppImage)",
-      "dismiss": "Despedir",
-      "showAllPlatforms": "Mostrar todas las plataformas",
-      "showLess": "Mostrar menos"
-    },
     "runtimeConfig": {
       "title": "Configuración de escritorio",
       "alertTitle": {
@@ -637,11 +626,6 @@
       "datacenter": "Centro de datos",
       "base": "Base",
       "nuclear": "Nuclear"
-    },
-    "community": {
-      "joinDiscussion": "Únete a la discusión",
-      "openDiscussion": "Abrir discusión",
-      "dontShowAgain": "No mostrar de nuevo"
     },
     "threatLabels": {
       "critical": "CRÍT",

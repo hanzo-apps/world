@@ -227,17 +227,6 @@
       "dontShowAgain": "不再显示",
       "gotIt": "知道了"
     },
-    "downloadBanner": {
-      "title": "桌面版可用",
-      "description": "原生性能，安全的本地密钥存储，离线地图切片。",
-      "macSilicon": "macOS (Apple Silicon)",
-      "macIntel": "macOS (Intel)",
-      "windows": "Windows (.exe)",
-      "linux": "Linux (.AppImage)",
-      "showAllPlatforms": "显示所有平台",
-      "showLess": "收起",
-      "dismiss": "忽略"
-    },
     "runtimeConfig": {
       "title": "桌面端配置",
       "alertTitle": {
@@ -534,11 +523,6 @@
       "datacenter": "数据中心",
       "base": "基地",
       "nuclear": "核设施"
-    },
-    "community": {
-      "joinDiscussion": "加入讨论",
-      "openDiscussion": "打开讨论",
-      "dontShowAgain": "不再显示"
     },
     "threatLabels": {
       "critical": "危急",

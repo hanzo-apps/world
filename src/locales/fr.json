@@ -227,17 +227,6 @@
             "dontShowAgain": "Ne plus afficher",
             "gotIt": "Compris"
         },
-        "downloadBanner": {
-            "title": "Application Bureau Disponible",
-            "description": "Performance native, stockage local sécurisé des clés, cartes hors ligne.",
-            "macSilicon": "macOS (Apple Silicon)",
-            "macIntel": "macOS (Intel)",
-            "windows": "Windows (.exe)",
-            "linux": "Linux (.AppImage)",
-            "dismiss": "Ignorer",
-            "showAllPlatforms": "Afficher toutes les plateformes",
-            "showLess": "Afficher moins"
-        },
         "runtimeConfig": {
             "title": "Configuration Bureau",
             "alertTitle": {
@@ -521,11 +510,6 @@
             "datacenter": "Centre de données",
             "base": "Base",
             "nuclear": "Nucléaire"
-        },
-        "community": {
-            "joinDiscussion": "Rejoindre la discussion",
-            "openDiscussion": "Ouvrir la discussion",
-            "dontShowAgain": "Ne plus afficher"
         },
         "threatLabels": {
             "critical": "CRIT",

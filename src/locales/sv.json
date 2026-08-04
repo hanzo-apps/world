@@ -144,17 +144,6 @@
       "dontShowAgain": "Visa inte igen",
       "gotIt": "Jag förstår"
     },
-    "downloadBanner": {
-      "title": "Desktop tillgänglig",
-      "description": "Inbyggd prestanda, säker lokal nyckellagring, offline kartplattor.",
-      "macSilicon": "macOS (Apple Silicon)",
-      "macIntel": "macOS (Intel)",
-      "windows": "Windows (.exe)",
-      "linux": "Linux (.AppImage)",
-      "dismiss": "Avfärda",
-      "showAllPlatforms": "Visa alla plattformar",
-      "showLess": "Visa mindre"
-    },
     "runtimeConfig": {
       "title": "Skrivbordskonfiguration",
       "alertTitle": {
@@ -507,11 +496,6 @@
       "datacenter": "Datacenter",
       "base": "Bas",
       "nuclear": "Kärnteknisk"
-    },
-    "community": {
-      "joinDiscussion": "Gå med i diskussionen",
-      "openDiscussion": "Öppna diskussion",
-      "dontShowAgain": "Visa inte igen"
     },
     "threatLabels": {
       "critical": "KRIT",
