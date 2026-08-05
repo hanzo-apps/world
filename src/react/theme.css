@@ -2,7 +2,7 @@
  * Brand theming for the React surface. @hanzo/brand's variables.css supplies the
  * canonical Hanzo token set (monochrome ramp, spacing, radii); world is the
  * monochrome surface, so the accent collapses to white — one knob, set here.
- * Imported once by the React entry so both the unified shell (HanzoAppHeader,
+ * Imported once by the React entry so both the unified shell (OrgHeader,
  * which reads --hanzo-* / accent tokens) and our own React islands theme
  * identically.
  */

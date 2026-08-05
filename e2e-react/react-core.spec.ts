@@ -5,7 +5,7 @@ import { expect, test, type Page } from '@playwright/test';
  *
  * These specs drive the REAL React entry (index.react.html), not a harness, and prove
  * the surface is cutover-ready:
- *   1. shell/auth mounts       — HanzoAppHeader + variant tabs render.
+ *   1. shell/auth mounts       — OrgHeader + variant tabs render.
  *   2. globe island renders    — GlobeIsland instantiates the existing MapContainer
  *                                (a WebGL canvas inside #mapContainer).
  *   3. variant filter          — switching a tab swaps the visible panel set (the
