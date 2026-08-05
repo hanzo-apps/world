@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { YStack, XStack } from '@hanzo/gui';
-import { HanzoAppHeader } from '@hanzogui/shell';
+import { OrgHeader } from '@hanzogui/shell';
 import { getSiteVariant, setSiteVariantRuntime } from '@/config/variant';
 import { GlobeIsland } from './components/GlobeIsland';
 import { VariantTabs } from './components/VariantTabs';
@@ -14,8 +14,13 @@ import { getGlobeInstance } from './hooks/globe-instance';
  * The React + @hanzo/gui foundation for world.hanzo.ai.
  *
  * Architecture proven end-to-end here:
- *   1. Unified signed-in shell — HanzoAppHeader(productId="world") from
+ *   1. Unified signed-in shell — OrgHeader(currentAppId="world") from
  *      @hanzogui/shell, themed by @hanzo/brand tokens (monochrome, accent #fff).
+ *      THE one signed-in bar: it carries the cross-app launcher and the app
+ *      breadcrumb the old HanzoAppHeader had no room for. The hard-refresh and
+ *      settings controls are off — this surface greets anonymous visitors, and
+ *      neither belongs in front of one. `account` keeps AccountControl, since
+ *      the built-in org dropdown has no signed-out state.
  *   2. The deck.gl globe as a React island (GlobeIsland) wrapping the EXISTING
  *      MapContainer — not a rewrite.
  *   3. Variant tabs + the panel framework: the whole panel catalog + PanelGrid (rail
@@ -62,9 +67,9 @@ function AppShell(): React.JSX.Element {
 
   return (
     <YStack flex={1} height="100%" backgroundColor="#000">
-      <HanzoAppHeader
-        productId="world"
-        org={{ id: 'hanzo', label: 'Hanzo' }}
+      <OrgHeader
+        currentApp="World"
+        currentAppId="world"
         search={{
           placeholder: 'Search or ask Hanzo…',
           onClick: () => {
@@ -73,6 +78,8 @@ function AppShell(): React.JSX.Element {
           },
         }}
         account={<AccountControl />}
+        hideHardRefresh
+        hideSettings
       />
 
       <XStack
