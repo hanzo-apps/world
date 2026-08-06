@@ -17,7 +17,7 @@
     "predictionMarkets": "Mercati predittivi",
     "loadingMarkets": "Caricamento mercati predittivi...",
     "infrastructure": "Esposizione infrastrutturale",
-    "briefUnavailable": "Rapporto IA non disponibile — configura GROQ_API_KEY nelle Impostazioni.",
+    "briefUnavailable": "Rapporto IA non disponibile — configura Hanzo AI nelle Impostazioni.",
     "cached": "In cache",
     "fresh": "Aggiornato",
     "noMarkets": "Nessun mercato predittivo trovato",
@@ -289,7 +289,7 @@
       "fresh": "Fresco",
       "noMarkets": "Nessun mercato di previsione trovato",
       "predictionMarkets": "Mercati predittivi",
-      "unavailable": "Brief AI non disponibile: configura GROQ_API_KEY in Impostazioni."
+      "unavailable": "Brief AI non disponibile: configura Hanzo AI in Impostazioni."
     },
     "countryBrief": {
       "components": {
@@ -322,7 +322,7 @@
       "predictionMarkets": "Mercati predittivi",
       "loadingMarkets": "Caricamento mercati predittivi...",
       "infrastructure": "Esposizione alle infrastrutture",
-      "briefUnavailable": "Brief AI non disponibile: configura GROQ_API_KEY in Impostazioni.",
+      "briefUnavailable": "Brief AI non disponibile: configura Hanzo AI in Impostazioni.",
       "cached": "In cache",
       "fresh": "Aggiornato",
       "noMarkets": "Nessun mercato predittivo trovato",
@@ -873,7 +873,7 @@
     },
     "insights": {
       "noStories": "Nessuna notizia urgente o multi-fonte al momento",
-      "infoTooltip": "<strong>Analisi basata sull'intelligenza artificiale</strong><br>• <strong>World Brief</strong>: Riepilogo AI (Groq/OpenRouter)<br>• <strong>Sentiment</strong>: Analisi del tono delle notizie<br>• <strong>Velocity</strong>: In rapido movimento storie<br>• <strong>Focal Points</strong>: correla le entità delle notizie con i segnali della mappa (militari, proteste, interruzioni)<br><em>Solo desktop • Fornito da Llama 3.3 + Focal Point Detection</em>"
+      "infoTooltip": "<strong>Analisi basata sull'intelligenza artificiale</strong><br>• <strong>World Brief</strong>: Riepilogo AI (Hanzo)<br>• <strong>Sentiment</strong>: Analisi del tono delle notizie<br>• <strong>Velocity</strong>: In rapido movimento storie<br>• <strong>Focal Points</strong>: correla le entità delle notizie con i segnali della mappa (militari, proteste, interruzioni)<br><em>Solo desktop • Fornito da Llama 3.3 + Focal Point Detection</em>"
     },
     "export": {
       "exportData": "Esporta dati"
