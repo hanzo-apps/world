@@ -17,7 +17,7 @@
     "predictionMarkets": "أسواق التنبؤ",
     "loadingMarkets": "جارٍ تحميل أسواق التنبؤ...",
     "infrastructure": "التعرض البنيوي",
-    "briefUnavailable": "الموجز الذكي غير متاح — قم بتهيئة GROQ_API_KEY في الإعدادات.",
+    "briefUnavailable": "الموجز الذكي غير متاح — قم بتهيئة Hanzo AI في الإعدادات.",
     "cached": "مخزّن مؤقتاً",
     "fresh": "محدّث",
     "noMarkets": "لم يتم العثور على أسواق تنبؤ",
@@ -311,7 +311,7 @@
       "fresh": "محدّث",
       "noMarkets": "لم يتم العثور على أسواق تنبؤ",
       "predictionMarkets": "أسواق التنبؤ",
-      "unavailable": "الموجز الذكي غير متاح — قم بتهيئة GROQ_API_KEY في الإعدادات."
+      "unavailable": "الموجز الذكي غير متاح — قم بتهيئة Hanzo AI في الإعدادات."
     },
     "countryBrief": {
       "identifying": "جارٍ تحديد الدولة...",
@@ -327,7 +327,7 @@
       "predictionMarkets": "أسواق التنبؤ",
       "loadingMarkets": "جارٍ تحميل أسواق التنبؤ...",
       "infrastructure": "التعرض البنيوي",
-      "briefUnavailable": "الموجز الذكي غير متاح — قم بتهيئة GROQ_API_KEY في الإعدادات.",
+      "briefUnavailable": "الموجز الذكي غير متاح — قم بتهيئة Hanzo AI في الإعدادات.",
       "cached": "مخزّن مؤقتاً",
       "fresh": "محدّث",
       "noMarkets": "لم يتم العثور على أسواق تنبؤ",
@@ -707,7 +707,7 @@
     },
     "insights": {
       "noStories": "لا توجد قصص عاجلة أو متعددة المصادر بعد",
-      "infoTooltip": "<strong>تحليل مدعوم بالذكاء الاصطناعي</strong><br>• <strong>موجز عالمي</strong>: ملخص AI (Groq/OpenRouter)<br>• <strong>المشاعر</strong>: تحليل نبرة الأخبار<br>• <strong>السرعة</strong>: قصص سريعة التطور<br>• <strong>النقاط المحورية</strong>: تربط كيانات الأخبار بإشارات الخريطة (عسكرية، احتجاجات، انقطاعات)<br><em>سطح المكتب فقط • مدعوم بـ Llama 3.3 + كشف النقاط المحورية</em>"
+      "infoTooltip": "<strong>تحليل مدعوم بالذكاء الاصطناعي</strong><br>• <strong>موجز عالمي</strong>: ملخص AI (Hanzo)<br>• <strong>المشاعر</strong>: تحليل نبرة الأخبار<br>• <strong>السرعة</strong>: قصص سريعة التطور<br>• <strong>النقاط المحورية</strong>: تربط كيانات الأخبار بإشارات الخريطة (عسكرية، احتجاجات، انقطاعات)<br><em>سطح المكتب فقط • مدعوم بـ Llama 3.3 + كشف النقاط المحورية</em>"
     },
     "cascade": {
       "noImpacts": "لم يتم رصد تأثيرات على الدول",

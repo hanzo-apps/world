@@ -1,7 +1,7 @@
 /**
  * Summarization Service with Fallback Chain
  * Server-side Redis caching handles cross-user deduplication
- * Fallback: Groq -> OpenRouter -> Browser T5
+ * Fallback: Hanzo gateway -> browser T5
  */
 
 import { mlWorker } from './ml-worker';
@@ -10,7 +10,7 @@ import { BETA_MODE } from '@/config/beta';
 import { isFeatureAvailable } from './runtime-config';
 import { fetchWithTimeout } from '@/utils';
 
-export type SummarizationProvider = 'groq' | 'openrouter' | 'browser' | 'cache';
+export type SummarizationProvider = 'hanzo' | 'browser' | 'cache';
 
 export interface SummarizationResult {
   summary: string;
@@ -20,10 +20,20 @@ export interface SummarizationResult {
 
 export type ProgressCallback = (step: number, total: number, message: string) => void;
 
-async function tryGroq(headlines: string[], geoContext?: string, lang?: string): Promise<SummarizationResult | null> {
-  if (!isFeatureAvailable('aiGroq')) return null;
+/**
+ * Summarize on OUR stack.
+ *
+ * This replaces `tryGroq` + `tryOpenRouter`, which were not two providers: both
+ * called `/v1/world/{groq,openrouter}-summarize`, and BOTH of those routes are
+ * the same Go handler (`handleSummarize`) hitting api.hanzo.ai. So the
+ * "fallback" was the identical request twice — a retry wearing a second
+ * vendor's name, which is also why the console announced `Groq success` for
+ * work Hanzo did.
+ */
+async function tryHanzo(headlines: string[], geoContext?: string, lang?: string): Promise<SummarizationResult | null> {
+  if (!isFeatureAvailable('aiSummary')) return null;
   try {
-    const response = await fetchWithTimeout('/v1/world/groq-summarize', {
+    const response = await fetchWithTimeout('/v1/world/summarize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ headlines, mode: 'brief', geoContext, variant: getSiteVariant(), lang }),
@@ -32,48 +42,15 @@ async function tryGroq(headlines: string[], geoContext?: string, lang?: string):
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       if (data.fallback) return null;
-      throw new Error(`Groq error: ${response.status}`);
+      throw new Error(`Summarize error: ${response.status}`);
     }
 
     const data = await response.json();
-    const provider = data.cached ? 'cache' : 'groq';
-    console.log(`[Summarization] ${provider === 'cache' ? 'Redis cache hit' : 'Groq success'}:`, data.model);
-    return {
-      summary: data.summary,
-      provider: provider as SummarizationProvider,
-      cached: !!data.cached,
-    };
+    const provider: SummarizationProvider = data.cached ? 'cache' : 'hanzo';
+    console.log(`[Summarization] ${provider === 'cache' ? 'cache hit' : 'Hanzo'}:`, data.model);
+    return { summary: data.summary, provider, cached: !!data.cached };
   } catch (error) {
-    console.warn('[Summarization] Groq failed:', error);
-    return null;
-  }
-}
-
-async function tryOpenRouter(headlines: string[], geoContext?: string, lang?: string): Promise<SummarizationResult | null> {
-  if (!isFeatureAvailable('aiOpenRouter')) return null;
-  try {
-    const response = await fetchWithTimeout('/v1/world/openrouter-summarize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ headlines, mode: 'brief', geoContext, variant: getSiteVariant(), lang }),
-    });
-
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      if (data.fallback) return null;
-      throw new Error(`OpenRouter error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const provider = data.cached ? 'cache' : 'openrouter';
-    console.log(`[Summarization] ${provider === 'cache' ? 'Redis cache hit' : 'OpenRouter success'}:`, data.model);
-    return {
-      summary: data.summary,
-      provider: provider as SummarizationProvider,
-      cached: !!data.cached,
-    };
-  } catch (error) {
-    console.warn('[Summarization] OpenRouter failed:', error);
+    console.warn('[Summarization] failed:', error);
     return null;
   }
 }
@@ -107,7 +84,7 @@ async function tryBrowserT5(headlines: string[], modelId?: string): Promise<Summ
 }
 
 /**
- * Generate a summary using the fallback chain: Groq -> OpenRouter -> Browser T5
+ * Generate a summary: the Hanzo gateway, falling back to the local browser model.
  * Server-side Redis caching is handled by the API endpoints
  * @param geoContext Optional geographic signal context to include in the prompt
  */
@@ -131,20 +108,16 @@ export async function generateSummary(
       const browserResult = await tryBrowserT5(headlines, 'summarization-beta');
       if (browserResult) {
         console.log('[BETA] Browser T5-small:', browserResult.summary);
-        tryGroq(headlines, geoContext).then(r => {
-          if (r) console.log('[BETA] Groq comparison:', r.summary);
+        tryHanzo(headlines, geoContext).then(r => {
+          if (r) console.log('[BETA] cloud comparison:', r.summary);
         }).catch(() => {});
         return browserResult;
       }
 
       // Warm model failed inference — cloud fallback
-      onProgress?.(2, totalSteps, 'Connecting to Groq AI...');
-      const groqResult = await tryGroq(headlines, geoContext);
-      if (groqResult) return groqResult;
-
-      onProgress?.(3, totalSteps, 'Trying OpenRouter...');
-      const openRouterResult = await tryOpenRouter(headlines, geoContext);
-      if (openRouterResult) return openRouterResult;
+      onProgress?.(2, totalSteps, 'Summarizing...');
+      const cloudResult = await tryHanzo(headlines, geoContext);
+      if (cloudResult) return cloudResult;
     } else {
       const totalSteps = 4;
       console.log('[BETA] T5-small not loaded yet, using cloud providers first');
@@ -153,17 +126,13 @@ export async function generateSummary(
         mlWorker.loadModel('summarization-beta').catch(() => {});
       }
 
-      // Cloud providers while model loads
-      onProgress?.(1, totalSteps, 'Connecting to Groq AI...');
-      const groqResult = await tryGroq(headlines, geoContext);
-      if (groqResult) {
-        console.log('[BETA] Groq:', groqResult.summary);
-        return groqResult;
+      // Cloud while the local model loads
+      onProgress?.(1, totalSteps, 'Summarizing...');
+      const cloudResult = await tryHanzo(headlines, geoContext);
+      if (cloudResult) {
+        console.log('[BETA] cloud:', cloudResult.summary);
+        return cloudResult;
       }
-
-      onProgress?.(2, totalSteps, 'Trying OpenRouter...');
-      const openRouterResult = await tryOpenRouter(headlines, geoContext);
-      if (openRouterResult) return openRouterResult;
 
       // Last resort: try browser T5 (may have finished loading by now)
       if (mlWorker.isAvailable) {
@@ -179,24 +148,17 @@ export async function generateSummary(
     return null;
   }
 
-  const totalSteps = 3;
+  const totalSteps = 2;
 
-  // Step 1: Try Groq (fast, 14.4K/day with 8b-instant + Redis cache)
-  onProgress?.(1, totalSteps, 'Connecting to Groq AI...');
-  const groqResult = await tryGroq(headlines, geoContext, lang);
-  if (groqResult) {
-    return groqResult;
+  // Step 1: the Hanzo gateway (server-side cache in front of it)
+  onProgress?.(1, totalSteps, 'Summarizing...');
+  const cloudResult = await tryHanzo(headlines, geoContext, lang);
+  if (cloudResult) {
+    return cloudResult;
   }
 
-  // Step 2: Try OpenRouter (fallback, 50/day + Redis cache)
-  onProgress?.(2, totalSteps, 'Trying OpenRouter...');
-  const openRouterResult = await tryOpenRouter(headlines, geoContext, lang);
-  if (openRouterResult) {
-    return openRouterResult;
-  }
-
-  // Step 3: Try Browser T5 (local, unlimited but slower)
-  onProgress?.(3, totalSteps, 'Loading local AI model...');
+  // Step 2: the local browser model (slower, but needs no session)
+  onProgress?.(2, totalSteps, 'Loading local AI model...');
   const browserResult = await tryBrowserT5(headlines);
   if (browserResult) {
     return browserResult;
@@ -219,11 +181,10 @@ export async function translateText(
 ): Promise<string | null> {
   if (!text) return null;
 
-  // Step 1: Try Groq
-  if (isFeatureAvailable('aiGroq')) {
-    onProgress?.(1, 2, 'Translating with Groq...');
+  if (isFeatureAvailable('aiSummary')) {
+    onProgress?.(1, 2, 'Translating...');
     try {
-      const response = await fetchWithTimeout('/v1/world/groq-summarize', {
+      const response = await fetchWithTimeout('/v1/world/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -238,32 +199,10 @@ export async function translateText(
         return data.summary;
       }
     } catch (e) {
-      console.warn('Groq translation failed', e);
+      console.warn('Translation failed', e);
     }
   }
 
-  // Step 2: Try OpenRouter
-  if (isFeatureAvailable('aiOpenRouter')) {
-    onProgress?.(2, 2, 'Translating with OpenRouter...');
-    try {
-      const response = await fetchWithTimeout('/v1/world/openrouter-summarize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          headlines: [text],
-          mode: 'translate',
-          variant: targetLang
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return data.summary;
-      }
-    } catch (e) {
-      console.warn('OpenRouter translation failed', e);
-    }
-  }
 
   return null;
 }
