@@ -97,6 +97,49 @@ jobs:
           registry: ghcr.io
           username: hanzo-dev
           password: ${{ secrets.GH_PAT }}
+      # The publishable ingest key, fetched HERE because this is the lane that
+      # actually builds. hanzo.yml declares it under `build_secrets`, but that is
+      # read by the hanzoai/ci reusable in cicd.yml — and that lane's jobs fail
+      # without ever starting, so the key never reached a build and the published
+      # image carried none. Verified by exporting 2.9.55: zero pk- tokens.
+      #
+      # `curl -sS`, not `-sf`: the runner invokes each step as `bash -e`, and `set`
+      # cannot take that back off, so `-sf` returning non-zero on a 4xx kills the
+      # step before any diagnostic can print. Capturing the status separately lets
+      # a failure SAY which failure it was.
+      - name: Fetch the ingest key from KMS
+        id: kms
+        env:
+          KMS_CLIENT_ID: ${{ secrets.KMS_CLIENT_ID }}
+          KMS_CLIENT_SECRET: ${{ secrets.KMS_CLIENT_SECRET }}
+          KMS_ENDPOINT: ${{ vars.KMS_ENDPOINT || 'https://api.hanzo.ai' }}
+        shell: bash --noprofile --norc {0}
+        run: |
+          set -uo pipefail
+          if [ -z "${KMS_CLIENT_ID:-}" ] || [ -z "${KMS_CLIENT_SECRET:-}" ]; then
+            echo "::error::KMS credentials absent — the bundle would ship with no ingest key"; exit 1
+          fi
+          login=$(curl -sS -m 30 "$KMS_ENDPOINT/v1/kms/auth/login" \
+            -H 'Content-Type: application/json' \
+            -d "{\"clientId\":\"$KMS_CLIENT_ID\",\"clientSecret\":\"$KMS_CLIENT_SECRET\"}" \
+            -w '\n%{http_code}')
+          code=$(printf '%s' "$login" | tail -n1)
+          TOKEN=$(printf '%s' "$login" | sed '$d' | jq -r '.accessToken // empty')
+          if [ -z "$TOKEN" ]; then
+            echo "::error::KMS login answered $code — CI credentials do not authenticate"; exit 1
+          fi
+          get=$(curl -sS -m 30 "$KMS_ENDPOINT/v1/kms/secrets/deploy/PUBLISHABLE_KEY?env=prod" \
+            -H "Authorization: Bearer $TOKEN" -w '\n%{http_code}')
+          code=$(printf '%s' "$get" | tail -n1)
+          V=$(printf '%s' "$get" | sed '$d' | jq -r '.value // empty')
+          case "$V" in
+            pk-*) ;;
+            '')   echo "::error::PUBLISHABLE_KEY read answered $code (hanzo/deploy env=prod) — refusing to ship an unattributed bundle"; exit 1 ;;
+            *)    echo "::error::PUBLISHABLE_KEY is not a publishable key (expected a pk- prefix)"; exit 1 ;;
+          esac
+          echo "::add-mask::$V"
+          echo "key=$V" >> "$GITHUB_OUTPUT"
+          echo "ingest key resolved ($code, ${#V} chars)"
       - name: Build + push ghcr.io/hanzoai/world
         uses: docker/build-push-action@v6
         with:
@@ -120,6 +163,7 @@ jobs:
           build-args: |
             VITE_MAPBOX_TOKEN=${{ secrets.VITE_MAPBOX_TOKEN }}
             APP_VERSION=${{ steps.ver.outputs.version }}
+            PUBLISHABLE_KEY=${{ steps.kms.outputs.key }}
       - name: Verify the pushed image is pullable (guard the image ⇔ tag invariant)
         # build-push-action can exit 0 while the manifest isn't yet resolvable at the
         # registry. Prove the image resolves BEFORE creating the git tag, so a bad push
