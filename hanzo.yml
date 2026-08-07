@@ -19,6 +19,9 @@ images:
     # env=prod) by hanzoai/ci — the key name IS the build-arg. Never in git.
     build_secrets:
       - VITE_MAPBOX_TOKEN
+      # Publishable ingest key (hanzo/deploy/PUBLISHABLE_KEY, env=prod). Without it
+      # every logged-out pageview and error is refused 401 at the door.
+      - PUBLISHABLE_KEY
 
 # Deploy: roll the freshly-built image onto the `world` Service CR. Fires only
 # on `main` (+ tags); PRs and forks build but never deploy. KMS hands back the
