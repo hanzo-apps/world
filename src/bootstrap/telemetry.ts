@@ -33,11 +33,21 @@ const isBrowser = (): boolean => typeof window !== 'undefined' && typeof documen
 
 // A write-only publishable ingest key (pk_…), if the deployment ships one. It is
 // safe to bundle (cannot read, only ingest) and lets logged-out visitors reach
-// the fail-closed door: the door HMAC-verifies it to an org, so anonymous
-// marketing/public pageviews + errors are accepted with no session. Mint via
-// POST /v1/ingest/keys. Absent → logged-out events post anonymously (best-effort).
+// the fail-closed door: the door verifies it to an org, so anonymous public
+// pageviews and errors are accepted with no session. Mint with
+// POST /v1/keys {"type":"publishable"}.
+//
+// VITE_PUBLISHABLE_KEY is the ONE name, and the one the fleet already carries end
+// to end: KMS holds `deploy/PUBLISHABLE_KEY`, hanzo.yml names it as a build
+// secret, and the Dockerfile re-exports it with the VITE_ prefix that makes Vite
+// inline it. This read used to be VITE_HANZO_INGEST_KEY — a spelling nothing in
+// KMS or CI carries, so no builder could ever supply it and the key was always
+// undefined here.
+//
+// Absent, logged-out events are NOT best-effort: the door refuses them outright
+// with 401 ingest_key_required, measured live for pageviews and exceptions alike.
 function ingestKey(): string | undefined {
-  const k = import.meta.env.VITE_HANZO_INGEST_KEY;
+  const k = import.meta.env.VITE_PUBLISHABLE_KEY;
   return k && k.trim() ? k.trim() : undefined;
 }
 

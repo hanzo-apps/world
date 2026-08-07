@@ -46,6 +46,14 @@ COPY . .
 # is same-origin, resolved in the browser).
 ARG VITE_MAPBOX_TOKEN
 ENV VITE_MAPBOX_TOKEN=$VITE_MAPBOX_TOKEN
+# Publishable ingest key for anonymous telemetry. Same KMS name as the rest of the
+# fleet (hanzo/deploy/PUBLISHABLE_KEY); VITE_ is what makes Vite inline it and is a
+# property of THIS build, so it is applied here and the store keeps one plain name.
+# Signed-in visitors are still attributed by their own bearer — telemetry.ts passes
+# this as the fallback, never as the config `ingestKey`, which would statically
+# override the user.
+ARG PUBLISHABLE_KEY
+ENV VITE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY
 # The version the builder is CUTTING, so the bundle self-reports the tag it ships
 # under. release.yml is the one place a release number is decided; package.json is
 # only the local-dev fallback (see the __APP_VERSION__ note in vite.config.ts).
