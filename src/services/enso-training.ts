@@ -21,15 +21,29 @@ export interface EnsoCount {
 export interface EnsoLedger {
   available: boolean;
   total: number;
-  engine: number;
-  heuristic: number;
-  enginePct: number;
+  /** Decision-provenance histogram, descending — the whole mix, not one bucket. */
+  bySource: EnsoCount[];
   rewarded: number;
   avgReward: number;
   avgConfidence: number;
   confidence: EnsoBucket[];
   tasks: EnsoCount[];
   models: EnsoCount[];
+}
+
+/**
+ * The decision mix as one headline tile: the leading source, the share of
+ * decisions it took, and the runner-up. Reporting the mix rather than one
+ * named bucket keeps the tile honest whichever strategy happens to lead.
+ */
+export function sourceMix(l: EnsoLedger): { value: string; label: string; sub?: string } {
+  const [top, next] = l.bySource ?? [];
+  if (!top || !l.total) return { value: '—', label: 'decision source' };
+  return {
+    value: `${Math.round((top.count / l.total) * 100)}%`,
+    label: top.name,
+    sub: next ? `then ${next.name} ${next.count}` : undefined,
+  };
 }
 
 export interface EnsoEvalRow {

@@ -16,7 +16,7 @@ test.describe('Enso Live Training panel', () => {
         scope: 'platform',
         window: { since: '2026-07-15T00:00:00Z', until: '2026-07-16T00:00:00Z', events: 48210 },
         cost: { saved_pct: 21.5, cumulative_saved_index: 1372, baseline_model: 'arm-1', priced_events: 41000 },
-        quality: { reward_rate: 0.31, rewarded_events: 1200, engine_share: 0.62, avg_confidence: 0.74, shadow_agreement: null },
+        quality: { reward_rate: 0.31, rewarded_events: 1200, learned_share: 0.62, avg_confidence: 0.74, shadow_agreement: null },
         by_task: { chat: { events: 30000, models: { 'arm-1': 18000, 'arm-2': 12000 } } },
         by_model: { 'arm-1': 30000, 'arm-2': 14000, 'arm-3': 4210 }, // opaque arms — must NOT render
         throughput: { per_hour: Array.from({ length: 24 }, (_, i) => 1500 + i * 40), total_window: 48210 },

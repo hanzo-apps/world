@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { YStack, XStack, SizableText } from '@hanzo/gui';
-import { getEnsoTraining, type EnsoTraining } from '@/services/enso-training';
-import { fmtInt, fmtPct } from '@/utils/cloud-format';
+import { getEnsoTraining, sourceMix, type EnsoTraining } from '@/services/enso-training';
+import { fmtInt } from '@/utils/cloud-format';
 import { Panel, PanelLiveDot, type PanelState } from './Panel';
 import type { PanelSlot } from './PanelGrid';
 
@@ -90,11 +90,7 @@ function FlywheelBody({ data }: { data: EnsoTraining }): React.JSX.Element {
         <YStack gap="$2.5">
           <XStack flexWrap="wrap" gap="$2">
             <StatTile value={fmtInt(l.total)} label="routing decisions" sub={data.window} />
-            <StatTile
-              value={fmtPct(l.enginePct, 0)}
-              label="engine-routed"
-              sub={`${fmtInt(l.heuristic)} heuristic`}
-            />
+            <StatTile value={sourceMix(l).value} label={sourceMix(l).label} sub={sourceMix(l).sub} />
             <StatTile
               value={fmtInt(l.rewarded)}
               label="rewarded"

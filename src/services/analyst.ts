@@ -105,7 +105,7 @@ export async function collectContext(host: AppHost): Promise<string> {
 }
 
 // Live Hanzo-cloud metrics for the analyst's grounding: traffic, platform 24h, the
-// Enso router (cost saved / reward / engine share / models routed), the flywheel
+// Enso router (cost saved / reward / learned share / models routed), the flywheel
 // ledger, and the caller's billing. Each read is best-effort (null on failure) so a
 // slow feed never blocks the answer. REAL data only — mirrors the panels verbatim.
 async function cloudSnapshot(): Promise<string> {
@@ -127,11 +127,11 @@ async function cloudSnapshot(): Promise<string> {
   }
   if (stats && !stats.unavailable) {
     const models = Object.keys(stats.by_model || {});
-    lines.push(`Enso router (24h): cost saved ${n(stats.cost.saved_pct, 1)}% vs premium (baseline ${stats.cost.baseline_model || '—'}), reward rate ${n(stats.quality.reward_rate * 100)}%, engine share ${n(stats.quality.engine_share * 100)}%, avg confidence ${n(stats.quality.avg_confidence * 100)}%${models.length ? `. Models routed: ${models.join(', ')}` : ''}.`);
+    lines.push(`Enso router (24h): cost saved ${n(stats.cost.saved_pct, 1)}% vs premium (baseline ${stats.cost.baseline_model || '—'}), reward rate ${n(stats.quality.reward_rate * 100)}%, learned share ${n(stats.quality.learned_share * 100)}%, avg confidence ${n(stats.quality.avg_confidence * 100)}%${models.length ? `. Models routed: ${models.join(', ')}` : ''}.`);
   }
   if (enso?.ledger?.available) {
     const l = enso.ledger;
-    lines.push(`Enso flywheel: ${n(l.total)} routing decisions, ${n(l.enginePct)}% engine-routed (${n(l.heuristic)} heuristic), ${n(l.rewarded)} rewarded, avg confidence ${n(l.avgConfidence, 2)}${l.models?.length ? `. Top models: ${l.models.slice(0, 4).map((m) => `${m.name} ${m.count}`).join(', ')}` : ''}.`);
+    lines.push(`Enso flywheel: ${n(l.total)} routing decisions, routed via ${l.bySource?.map((s) => `${s.name} ${s.count}`).join(', ') || 'no recorded source'}, ${n(l.rewarded)} rewarded, avg confidence ${n(l.avgConfidence, 2)}${l.models?.length ? `. Top models: ${l.models.slice(0, 4).map((m) => `${m.name} ${m.count}`).join(', ')}` : ''}.`);
   }
   if (bill) {
     const bal = bill.balance ? `, $${n(bill.balance.balance / 100, 2)} balance` : '';
