@@ -1,10 +1,10 @@
 import { Panel } from './Panel';
-import { getEnsoTraining, type EnsoTraining } from '@/services/enso-training';
+import { getEnsoTraining, sourceMix, type EnsoTraining } from '@/services/enso-training';
 import { escapeHtml } from '@/utils/sanitize';
-import { fmtInt, fmtPct, statTile, shareBar } from '@/utils/cloud-format';
+import { fmtInt, statTile, shareBar } from '@/utils/cloud-format';
 
 // Enso flywheel — the router's self-improvement loop for the AI variant. Polls
-// /v1/world/enso-training and renders: routing-ledger growth + engine-vs-heuristic
+// /v1/world/enso-training and renders: routing-ledger growth + the decision mix
 // mix + confidence histogram (live only, needs a service token), and the latest
 // enso-bench eval scores (always present). Honest state: when the ledger is
 // unreachable the eval scores still render with a quiet note — never a faked mix.
@@ -47,9 +47,10 @@ export class EnsoFlywheelPanel extends Panel {
     // ── ledger: growth + mix + confidence (live only) ──
     let ledgerSection = '';
     if (l.available) {
+      const mix = sourceMix(l);
       const tiles = [
         statTile(fmtInt(l.total), 'routing decisions', d.window),
-        statTile(fmtPct(l.enginePct, 0), 'engine-routed', `${fmtInt(l.heuristic)} heuristic`),
+        statTile(mix.value, mix.label, mix.sub),
         statTile(fmtInt(l.rewarded), 'rewarded', l.rewarded > 0 ? `avg ${l.avgReward.toFixed(2)}` : undefined),
         statTile(l.avgConfidence.toFixed(2), 'avg confidence'),
       ].join('');

@@ -11,7 +11,7 @@ import type { PanelSlot } from './PanelGrid';
  * EnsoTrainingPanel — the vanilla `EnsoTrainingPanel` (src/components/EnsoTrainingPanel.ts)
  * ported onto the React Panel chassis. A live window into the learned router Hanzo
  * trains on its own routing decisions: platform-wide aggregates (throughput,
- * learned-engine share, a blended-price cost-saved proxy, the latest retrain gate)
+ * learned share, a blended-price cost-saved proxy, the latest retrain gate)
  * plus the REAL served-model catalog it trains across.
  *
  * It REUSES the vanilla data layer verbatim — `getRouterStats` + `getCloudModels`
@@ -27,7 +27,7 @@ import type { PanelSlot } from './PanelGrid';
 const HOURS = 24;
 
 /** Normalize a 0..1 fraction OR an already-scaled percent into 0..100 (verbatim
- * from the vanilla panel — engine_share/shadow_agreement arrive as fractions). */
+ * from the vanilla panel — learned_share/shadow_agreement arrive as fractions). */
 function pctOf(v: number): number {
   return Math.abs(v) <= 1 ? v * 100 : v;
 }
@@ -97,7 +97,7 @@ export function EnsoTrainingPanel({ slot }: { slot: PanelSlot }): React.JSX.Elem
       title="Enso Live Training"
       state={state}
       loadingText="Connecting to the Enso router…"
-      infoTooltip="Hanzo Cloud — the learned router, live. Platform-wide aggregates from the router that continually retrains on its own routing decisions (throughput, learned-engine share, a blended-price cost-saved proxy, the latest retrain gate), plus the REAL model catalog it serves and trains across — real names, tiers, context and pricing from the public /v1/models. No fabricated numbers."
+      infoTooltip="Hanzo Cloud — the learned router, live. Platform-wide aggregates from the router that continually retrains on its own routing decisions (throughput, learned share, a blended-price cost-saved proxy, the latest retrain gate), plus the REAL model catalog it serves and trains across — real names, tiers, context and pricing from the public /v1/models. No fabricated numbers."
       actions={<PanelLiveDot />}
       sparkline={spark}
     >
@@ -127,7 +127,7 @@ function EnsoBody({
 
       <XStack gap="$2" flexWrap="wrap">
         <StatTile value={fmtPct(stats.cost.saved_pct, 1)} label="cost saved" sub={`last ${HOURS}h`} />
-        <StatTile value={fmtPct(pctOf(q.engine_share), 0)} label="learned-engine share" sub="vs heuristic" />
+        <StatTile value={fmtPct(pctOf(q.learned_share), 0)} label="learned share" sub="vs static seed" />
         <StatTile value={fmtCompact(stats.window.events)} label={`events · ${HOURS}h`} />
       </XStack>
 
