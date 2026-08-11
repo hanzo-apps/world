@@ -23,18 +23,6 @@ images:
       - VITE_ANALYTICS_WEBSITE_ID
       - VITE_GTM_ID
 
-# Deploy: roll the freshly-built image onto the `world` Service CR. Fires only
-# on `main` (+ tags); PRs and forks build but never deploy. KMS hands back the
-# kubeconfig at run time.
-deploy:
-  cluster: do-sfo3-hanzo-k8s
-  namespace: hanzo
-  # Quoted to dodge YAML 1.1 boolean coercion of a bare `on:` key.
-  "on": [main]
-  services:
-    - name: world
-      image: world
-
 # KMS (kms.hanzo.ai, Universal Auth) supplies the GHCR push token and the
 # target kubeconfig at run time. Only KMS_CLIENT_ID/KMS_CLIENT_SECRET live in
 # GitHub; everything else is fetched here.
