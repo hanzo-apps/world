@@ -19,9 +19,14 @@ images:
     # env=prod) by hanzoai/ci — the key name IS the build-arg. Never in git.
     build_secrets:
       - VITE_MAPBOX_TOKEN
-      - VITE_SENTRY_DSN
-      - VITE_ANALYTICS_WEBSITE_ID
-      - VITE_GTM_ID
+    # VITE_SENTRY_DSN and VITE_ANALYTICS_WEBSITE_ID were declared here and read
+    # by nothing — no source file names either. VITE_GTM_ID is read, by
+    # src/bootstrap/analytics.ts, but the Dockerfile declares no ARG for it, so
+    # a sealed value still could not reach the bundle. None of the three is in
+    # KMS, and the build correctly refuses to bake an empty credential:
+    #   ::error::build_secret VITE_SENTRY_DSN is not readable at
+    #   https://api.hanzo.ai (hanzo/deploy env=prod)
+    # Wiring GTM takes an ARG in the Dockerfile and a sealed value, both.
 
 # KMS (kms.hanzo.ai, Universal Auth) supplies the GHCR push token and the
 # target kubeconfig at run time. Only KMS_CLIENT_ID/KMS_CLIENT_SECRET live in
