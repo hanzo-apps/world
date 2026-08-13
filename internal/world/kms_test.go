@@ -107,22 +107,22 @@ func pointWorldAtStub(t *testing.T, s *kmsStub) {
 
 func TestLoadKMSSecrets_InjectsAndPrecedence(t *testing.T) {
 	s := newKMSStub(t, map[string]string{
-		"HANZO_AI_KEY": "from-kms",
+		"FINNHUB_API_KEY": "from-kms",
 		"FRED_API_KEY": "from-kms-fred",
 	})
 	pointWorldAtStub(t, s)
 
 	// FRED is set explicitly in env → must NOT be overwritten (explicit wins).
 	t.Setenv("FRED_API_KEY", "explicit-wins")
-	// HANZO_AI_KEY starts empty → must be injected from KMS.
-	t.Setenv("HANZO_AI_KEY", "")
+	// FINNHUB_API_KEY starts empty → must be injected from KMS.
+	t.Setenv("FINNHUB_API_KEY", "")
 	// WS_RELAY_URL is not in KMS → must stay unset.
 	t.Setenv("WS_RELAY_URL", "")
 
 	LoadKMSSecrets(context.Background())
 
-	if got := env("HANZO_AI_KEY"); got != "from-kms" {
-		t.Fatalf("HANZO_AI_KEY: want injected %q, got %q", "from-kms", got)
+	if got := env("FINNHUB_API_KEY"); got != "from-kms" {
+		t.Fatalf("FINNHUB_API_KEY: want injected %q, got %q", "from-kms", got)
 	}
 	if got := env("FRED_API_KEY"); got != "explicit-wins" {
 		t.Fatalf("FRED_API_KEY: explicit env must win, got %q", got)
@@ -154,20 +154,20 @@ func TestLoadKMSSecrets_InjectsAndPrecedence(t *testing.T) {
 func TestLoadKMSSecrets_SkipsWithoutCreds(t *testing.T) {
 	t.Setenv("KMS_CLIENT_ID", "")
 	t.Setenv("KMS_CLIENT_SECRET", "")
-	t.Setenv("HANZO_AI_KEY", "")
+	t.Setenv("FINNHUB_API_KEY", "")
 
 	LoadKMSSecrets(context.Background()) // must be a clean no-op
 
-	if got := env("HANZO_AI_KEY"); got != "" {
-		t.Fatalf("no creds ⇒ no injection, got HANZO_AI_KEY=%q", got)
+	if got := env("FINNHUB_API_KEY"); got != "" {
+		t.Fatalf("no creds ⇒ no injection, got FINNHUB_API_KEY=%q", got)
 	}
 }
 
 func TestLoadKMSSecrets_DegradesOnTimeout(t *testing.T) {
-	s := newKMSStub(t, map[string]string{"HANZO_AI_KEY": "from-kms"})
+	s := newKMSStub(t, map[string]string{"FINNHUB_API_KEY": "from-kms"})
 	s.loginDelay = 300 * time.Millisecond
 	pointWorldAtStub(t, s)
-	t.Setenv("HANZO_AI_KEY", "")
+	t.Setenv("FINNHUB_API_KEY", "")
 
 	// Shrink the boot timeout so the slow login trips it.
 	prev := kmsBootTimeout
@@ -181,14 +181,14 @@ func TestLoadKMSSecrets_DegradesOnTimeout(t *testing.T) {
 	if elapsed > 2*time.Second {
 		t.Fatalf("degrade took too long: %v (must not block boot)", elapsed)
 	}
-	if got := env("HANZO_AI_KEY"); got != "" {
-		t.Fatalf("timeout ⇒ no injection, got HANZO_AI_KEY=%q", got)
+	if got := env("FINNHUB_API_KEY"); got != "" {
+		t.Fatalf("timeout ⇒ no injection, got FINNHUB_API_KEY=%q", got)
 	}
 }
 
 func TestFetchKMSSecrets_LoginFailsOn401(t *testing.T) {
-	s := newKMSStub(t, map[string]string{"HANZO_AI_KEY": "x"})
-	cfg := kmsConfig{host: s.URL, org: "hanzo", env: "prod", path: "world-secrets", keys: []string{"HANZO_AI_KEY"}}
+	s := newKMSStub(t, map[string]string{"FINNHUB_API_KEY": "x"})
+	cfg := kmsConfig{host: s.URL, org: "hanzo", env: "prod", path: "world-secrets", keys: []string{"FINNHUB_API_KEY"}}
 
 	_, err := fetchKMSSecrets(context.Background(), &http.Client{Timeout: 2 * time.Second}, cfg, "bad-id", "bad-secret")
 	if err == nil {
@@ -200,18 +200,18 @@ func TestFetchKMSSecrets_LoginFailsOn401(t *testing.T) {
 }
 
 func TestFetchKMSSecrets_ValueRoundTripAnd404Skip(t *testing.T) {
-	s := newKMSStub(t, map[string]string{"HANZO_AI_KEY": "round-trip-value"})
+	s := newKMSStub(t, map[string]string{"FINNHUB_API_KEY": "round-trip-value"})
 	cfg := kmsConfig{
 		host: s.URL, org: "hanzo", env: "prod", path: "world-secrets",
-		keys: []string{"HANZO_AI_KEY", "FRED_API_KEY"}, // FRED absent → 404 → skipped
+		keys: []string{"FINNHUB_API_KEY", "FRED_API_KEY"}, // FRED absent → 404 → skipped
 	}
 
 	got, err := fetchKMSSecrets(context.Background(), &http.Client{Timeout: 2 * time.Second}, cfg, s.wantID, s.wantSecret)
 	if err != nil {
 		t.Fatalf("fetch: %v", err)
 	}
-	if got["HANZO_AI_KEY"] != "round-trip-value" {
-		t.Fatalf("value round-trip: got %q", got["HANZO_AI_KEY"])
+	if got["FINNHUB_API_KEY"] != "round-trip-value" {
+		t.Fatalf("value round-trip: got %q", got["FINNHUB_API_KEY"])
 	}
 	if _, present := got["FRED_API_KEY"]; present {
 		t.Fatalf("404 key must be skipped, but present: %q", got["FRED_API_KEY"])
