@@ -126,11 +126,10 @@ func (s *Server) handleAnalyst(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Paid usage: the analyst chat is metered to the signed-in user's org, so it
-	// requires the caller's OWN IAM bearer — never the funded service key. That key
-	// (a.key / HANZO_AI_KEY) backs ONLY the anonymous auto-insight endpoints
-	// (summarize/classify/country-intel via bearerFor); chat must not silently burn
-	// it, or "paid usage" would never actually meter. Signed-out callers get a quiet
-	// sign-in prompt (never a 5xx).
+	// requires the caller's OWN IAM bearer. There is no service key to fall back to
+	// anywhere in this service any more — every AI path, this one and the
+	// summarize/classify/country-intel endpoints, runs on the acting person's token
+	// or not at all. Signed-out callers get a quiet sign-in prompt (never a 5xx).
 	bearer := userBearer(r)
 	if bearer == "" {
 		writeJSON(w, http.StatusOK, "", map[string]any{
