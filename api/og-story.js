@@ -76,13 +76,13 @@ export default function handler(req, res) {
     ${Array.from({length: 16}, (_, i) => `<line x1="0" y1="${i*40}" x2="1200" y2="${i*40}" stroke="#fff" stroke-width="1"/>`).join('\n    ')}
   </g>
 
-  <!-- WORLDMONITOR brand -->
-  <text x="60" y="56" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="700" fill="${levelColor}" letter-spacing="6"
-    >WORLDMONITOR</text>
+  <!-- Brand. Neutral, not the level colour: the name is not a data channel. -->
+  <text x="60" y="56" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="700" fill="#999" letter-spacing="6"
+    >HANZO WORLD</text>
 
-  <!-- Status pill -->
-  <rect x="290" y="38" width="${levelLabel.length * 9 + 24}" height="26" rx="13" fill="${levelColor}" opacity="0.15"/>
-  <text x="${290 + (levelLabel.length * 9 + 24) / 2}" y="56" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="${levelColor}" text-anchor="middle"
+  <!-- Status pill — follows the wordmark, which is one character shorter -->
+  <rect x="272" y="38" width="${levelLabel.length * 9 + 24}" height="26" rx="13" fill="${levelColor}" opacity="0.15"/>
+  <text x="${272 + (levelLabel.length * 9 + 24) / 2}" y="56" font-family="system-ui, sans-serif" font-size="13" font-weight="700" fill="${levelColor}" text-anchor="middle"
     >${levelLabel}</text>
 
   <!-- Date -->
@@ -194,14 +194,16 @@ export default function handler(req, res) {
   <rect x="0" y="490" width="1200" height="140" fill="#080810"/>
   <line x1="0" y1="490" x2="1200" y2="490" stroke="#222" stroke-width="1"/>
 
-  <!-- Logo area -->
-  <circle cx="92" cy="545" r="24" fill="none" stroke="${levelColor}" stroke-width="2"/>
-  <text x="92" y="551" font-family="system-ui, sans-serif" font-size="18" font-weight="800" fill="${levelColor}" text-anchor="middle"
-    >W</text>
+  <!-- Signature: the Hanzo mark on its native 67-unit grid, drawn 40 wide from the
+       card margin and centred on the two lines beside it. Same geometry as
+       public/favico/hanzo-favicon.svg. -->
+  <g transform="translate(60 522) scale(0.597)" fill="#ddd">
+    <path d="M22.21 0H0V22.3184H22.21V0ZM66.7198 0H44.5098V22.3184H66.7198V0ZM66.7038 22.3184H22.2534L0.0878906 44.6367H44.4634L66.7038 22.3184ZM22.21 67V44.6369H0V67H22.21ZM66.7198 67V44.6369H44.5098V67H66.7198Z"/>
+  </g>
 
-  <text x="130" y="538" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#ddd" letter-spacing="3"
-    >WORLDMONITOR</text>
-  <text x="130" y="562" font-family="system-ui, sans-serif" font-size="15" fill="#777"
+  <text x="116" y="538" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="700" fill="#ddd" letter-spacing="3"
+    >HANZO WORLD</text>
+  <text x="116" y="562" font-family="system-ui, sans-serif" font-size="15" fill="#777"
     >Real-time global intelligence monitoring</text>
 
   <!-- CTA -->
@@ -211,7 +213,7 @@ export default function handler(req, res) {
 
   <!-- URL + date -->
   <text x="60" y="610" font-family="system-ui, sans-serif" font-size="14" fill="#555"
-    >worldmonitor.app · ${dateStr} · Free &amp; open source</text>
+    >world.hanzo.ai · ${dateStr} · Free &amp; open source</text>
 </svg>`;
 
   res.setHeader('Content-Type', 'image/svg+xml');
