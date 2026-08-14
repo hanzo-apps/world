@@ -1,12 +1,13 @@
-# Canonical CI/CD config for hanzoai/world — read by both the hanzoai/ci
-# reusable workflow (.github/workflows/cicd.yml) and platform.hanzo.ai.
+# Canonical CI/CD config for world — read by both the hanzoai/ci reusable
+# workflow (.hanzo/workflows/cicd.yml) and platform.hanzo.ai.
 # One image (the Vite SPA served by hanzoai/static), and a main-branch rollout
 # onto the existing `world` operator Service CR
 # (universe: infra/k8s/operator/crs/world.yaml).
 #
-# No separate `test:` block: the Dockerfile IS the gate — `npm ci && npm run
-# build` fails the image on any type error or build break, so nothing broken
-# ships (same pattern as hanzoai/finance + hanzoai/console).
+# The Dockerfile gates the code: `npm ci && npm run build` fails the image on
+# any type error or build break, so nothing broken ships (same pattern as
+# hanzoai/finance + hanzoai/console). Prose is the one thing that build never
+# compiles, so it gets the `test:` gate below.
 
 images:
   - name: world
@@ -34,3 +35,16 @@ images:
 kms:
   path: /deploy
   environment: prod
+
+# Markdown, the one source the image build never reads. `.markdownlint-cli2.jsonc`
+# pins the three rules the repo agreed to (MD012/MD022/MD032) and `lint:md` is the
+# script that applies them; `npm ci` takes the version from the lockfile, so the
+# pin lives in one place. This gate is declared here rather than in a second
+# workflow file because the shared lane is the one lane, and a gate it does not
+# read is a gate that does not run.
+test:
+  - name: markdown
+    run: |
+      set -e
+      npm ci
+      npm run lint:md
