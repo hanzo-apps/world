@@ -543,41 +543,53 @@ func TestHandleModelsCuratedRoster(t *testing.T) {
 	}
 }
 
-// TestAnalystChatRequiresUserBearer pins the pro-model contract: the analyst CHAT
-// is paid usage, metered to the signed-in user's org via their OWN IAM bearer —
-// NEVER the funded service key. The funded key (a.key / HANZO_AI_KEY) backs only
-// the anonymous auto-insight endpoints (summarize/classify/country-intel). So even
-// with a funded key configured, an unauthenticated chat call must be refused with a
-// quiet sign-in prompt (200, skipped) — not silently answered on the shared key.
+// TestAIRequiresSignedInUser pins the whole contract: every AI path on this
+// service runs on the ACTING PERSON's IAM bearer, or it does not run.
 //
-// Regression guard: if handleAnalyst reverts to bearerFor(r), the funded key would
-// satisfy the bearer, the handler would fall through to a real upstream call, and
-// this test would hang/fail instead of returning the deterministic skip below.
-func TestAnalystChatRequiresUserBearer(t *testing.T) {
+// There is no service key to fall back to. Inference is metered to the org the
+// bearer names, so a shared one would bill every signed-out visitor's AI to
+// whoever owns it, and hand AI to people who have neither signed in nor chosen a
+// plan. Chat was always this way; the summarize/classify/country-intel endpoints
+// used to fall back to a funded key and no longer do.
+//
+// Signed out, each must answer a quiet 200 with skipped=true and a sign-in
+// prompt — never a 5xx, and never a real upstream call. If a fallback is ever
+// reintroduced, the handler falls through to a live request and this test hangs
+// or fails instead of returning the deterministic skip below.
+func TestAIRequiresSignedInUser(t *testing.T) {
 	s := NewServer()
-	s.ai.key = "hk-test-funded" // funded key present (backs anonymous auto-insights only)
 	mux := http.NewServeMux()
 	s.Mount(mux)
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
 
-	body := `{"messages":[{"role":"user","content":"hi"}],"context":""}`
-	resp, err := http.Post(ts.URL+"/v1/world/analyst", "application/json", strings.NewReader(body))
-	if err != nil {
-		t.Fatalf("request failed: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("status = %d, want 200 (quiet sign-in prompt, never 5xx)", resp.StatusCode)
-	}
-	var out map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if out["skipped"] != true {
-		t.Fatalf("anonymous chat not refused — funded key leaked into paid chat path: %+v", out)
-	}
-	if reason, _ := out["reason"].(string); !strings.Contains(reason, "Sign in") {
-		t.Errorf("reason = %q, want a sign-in prompt", reason)
+	for _, tc := range []struct {
+		path string
+		body string
+	}{
+		{"/v1/world/analyst", `{"messages":[{"role":"user","content":"hi"}],"context":""}`},
+		{"/v1/world/groq-summarize", `{"headlines":["a headline"]}`},
+		{"/v1/world/classify-batch", `{"titles":["a title"]}`},
+	} {
+		t.Run(tc.path, func(t *testing.T) {
+			resp, err := http.Post(ts.URL+tc.path, "application/json", strings.NewReader(tc.body))
+			if err != nil {
+				t.Fatalf("request failed: %v", err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("status = %d, want 200 (quiet sign-in prompt, never 5xx)", resp.StatusCode)
+			}
+			var out map[string]any
+			if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if out["skipped"] != true {
+				t.Fatalf("signed-out call not refused — a service key leaked back in: %+v", out)
+			}
+			if reason, _ := out["reason"].(string); !strings.Contains(reason, "Sign in") {
+				t.Errorf("reason = %q, want a sign-in prompt", reason)
+			}
+		})
 	}
 }

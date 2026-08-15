@@ -18,7 +18,7 @@ import (
 //     "connecting…", never fabricated, never 5xx).
 func TestCloudRouterStatsProxy(t *testing.T) {
 	// The bare aggregate the client must ultimately see...
-	const inner = `{"scope":"platform","window":{"events":1234},"quality":{"engine_share":0.62,"shadow_agreement":null},"by_model":{"arm-1":700,"arm-2":534},"cost":{"saved_pct":21.5}}`
+	const inner = `{"scope":"platform","window":{"events":1234},"quality":{"learned_share":0.62,"shadow_agreement":null},"by_model":{"arm-1":700,"arm-2":534},"cost":{"saved_pct":21.5}}`
 	// ...delivered by ai inside its casibase envelope, which the proxy unwraps.
 	const canned = `{"status":"ok","msg":"","data":` + inner + `,"data2":null}`
 

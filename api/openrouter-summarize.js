@@ -7,14 +7,14 @@
  */
 
 import { getCachedJson, setCachedJson, hashString } from './_upstash-cache.js';
+import { HANZO_API_URL, FAST_MODEL, hanzoKey } from './_hanzo-ai.js';
 import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 
 export const config = {
   runtime: 'edge',
 };
 
-const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MODEL = 'openrouter/free';
+const MODEL = FAST_MODEL;
 const CACHE_TTL_SECONDS = 86400; // 24 hours
 
 const CACHE_VERSION = 'v3';
@@ -90,9 +90,9 @@ export default async function handler(request) {
     });
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = hanzoKey();
   if (!apiKey) {
-    return new Response(JSON.stringify({ summary: null, fallback: true, skipped: true, reason: 'OPENROUTER_API_KEY not configured' }), {
+    return new Response(JSON.stringify({ summary: null, fallback: true, skipped: true, reason: 'HANZO_API_KEY not configured' }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
@@ -214,7 +214,7 @@ Rules:
       userPrompt = `Key takeaway:\n${headlineText}${intelSection}`;
     }
 
-    const response = await fetch(OPENROUTER_API_URL, {
+    const response = await fetch(HANZO_API_URL, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,

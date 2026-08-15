@@ -11,7 +11,7 @@ const ROUTER_STATS = {
   scope: 'platform',
   window: { since: '2026-07-17T00:00:00Z', until: '2026-07-18T00:00:00Z', events: 12345 },
   cost: { saved_pct: 0.23, cumulative_saved_index: 98765, baseline_model: 'x', priced_events: 100 },
-  quality: { reward_rate: 0.5, rewarded_events: 10, engine_share: 0.62, avg_confidence: 0.8, shadow_agreement: 0.91 },
+  quality: { reward_rate: 0.5, rewarded_events: 10, learned_share: 0.62, avg_confidence: 0.8, shadow_agreement: 0.91 },
   by_task: {},
   by_model: { 'arm-1': 100, 'arm-2': 50, 'arm-3': 25 }, // opaque arms — must NOT render
   throughput: { per_hour: [1, 2, 3, 4, 5, 6], total_window: 21 },

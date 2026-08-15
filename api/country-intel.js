@@ -5,14 +5,14 @@
  */
 
 import { getCachedJson, setCachedJson, hashString } from './_upstash-cache.js';
+import { HANZO_API_URL, FAST_MODEL, hanzoKey } from './_hanzo-ai.js';
 import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 
 export const config = {
   runtime: 'edge',
 };
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const MODEL = 'llama-3.1-8b-instant';
+const MODEL = FAST_MODEL;
 const CACHE_TTL_SECONDS = 7200; // 2 hours
 const CACHE_VERSION = 'ci-v2';
 
@@ -37,9 +37,9 @@ export default async function handler(request) {
     });
   }
 
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = hanzoKey();
   if (!apiKey) {
-    return new Response(JSON.stringify({ intel: null, fallback: true, skipped: true, reason: 'GROQ_API_KEY not configured' }), {
+    return new Response(JSON.stringify({ intel: null, fallback: true, skipped: true, reason: 'HANZO_API_KEY not configured' }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
@@ -136,7 +136,7 @@ Rules:
 
     const userPrompt = `Country: ${country} (${code})${dataSection}`;
 
-    const groqRes = await fetch(GROQ_API_URL, {
+    const aiRes = await fetch(HANZO_API_URL, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -153,17 +153,17 @@ Rules:
       }),
     });
 
-    if (!groqRes.ok) {
-      const errText = await groqRes.text();
-      console.error('[CountryIntel] Groq error:', groqRes.status, errText);
+    if (!aiRes.ok) {
+      const errText = await aiRes.text();
+      console.error('[CountryIntel] model error:', aiRes.status, errText);
       return new Response(JSON.stringify({ error: 'AI service error', fallback: true }), {
         status: 502,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    const groqData = await groqRes.json();
-    const brief = groqData.choices?.[0]?.message?.content || '';
+    const aiData = await aiRes.json();
+    const brief = aiData.choices?.[0]?.message?.content || '';
 
     const result = {
       brief,

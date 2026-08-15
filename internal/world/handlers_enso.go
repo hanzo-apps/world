@@ -55,9 +55,10 @@ type ensoCount struct {
 type ensoLedgerStats struct {
 	Available     bool         `json:"available"` // false ⇒ ledger upstream unreachable
 	Total         int          `json:"total"`     // decisions in the window
-	Engine        int          `json:"engine"`
-	Heuristic     int          `json:"heuristic"`
-	EnginePct     float64      `json:"enginePct"`
+	// BySource is the decision-provenance histogram, descending. It replaced a
+	// two-way engine/heuristic split that named one bucket in the headline and
+	// silently discarded every other source (explore, override, explicit, family).
+	BySource      []ensoCount  `json:"bySource"`
 	Rewarded      int          `json:"rewarded"`
 	AvgReward     float64      `json:"avgReward"`
 	AvgConfidence float64      `json:"avgConfidence"`
@@ -190,6 +191,7 @@ func (s *Server) foldRoutingLedger(ctx context.Context, since string) (ensoLedge
 	conf := make([]int, len(confLabels))
 	tasks := map[string]int{}
 	models := map[string]int{}
+	sources := map[string]int{}
 	var confSum float64
 	for _, line := range strings.Split(body, "\n") {
 		line = strings.TrimSpace(line)
@@ -201,11 +203,8 @@ func (s *Server) foldRoutingLedger(ctx context.Context, since string) (ensoLedge
 			continue
 		}
 		stats.Total++
-		switch row.Source {
-		case "engine":
-			stats.Engine++
-		case "heuristic":
-			stats.Heuristic++
+		if row.Source != "" {
+			sources[row.Source]++
 		}
 		confSum += row.Confidence
 		conf[confBucketIdx(row.Confidence)]++
@@ -218,8 +217,8 @@ func (s *Server) foldRoutingLedger(ctx context.Context, since string) (ensoLedge
 	}
 	if stats.Total > 0 {
 		stats.AvgConfidence = round2(confSum / float64(stats.Total))
-		stats.EnginePct = round1(float64(stats.Engine) / float64(stats.Total) * 100)
 	}
+	stats.BySource = topCounts(sources, 6)
 	stats.Confidence = bucketsToHistogram(conf)
 	stats.Tasks = topCounts(tasks, 6)
 	stats.Models = topCounts(models, 6)

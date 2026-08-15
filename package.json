@@ -1,6 +1,6 @@
 {
   "name": "@hanzo/world",
-  "description": "Hanzo World \u2014 real-time global intelligence dashboard.",
+  "description": "Hanzo World — real-time global intelligence dashboard.",
   "private": true,
   "version": "2.4.60",
   "packageManager": "pnpm@11.17.0",
@@ -82,7 +82,7 @@
     "@hanzo/event": "^0.3.3",
     "@hanzo/gui": "^7.3.0",
     "@hanzogui/config": "^7.3.0",
-    "@hanzogui/shell": "^7.6.1",
+    "@hanzogui/shell": "^8.1.4",
     "@luma.gl/engine": "^9.3.6",
     "@luma.gl/shadertools": "^9.3.6",
     "@upstash/redis": "^1.38.0",

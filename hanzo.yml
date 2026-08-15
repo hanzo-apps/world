@@ -19,25 +19,32 @@ images:
     # env=prod) by hanzoai/ci — the key name IS the build-arg. Never in git.
     build_secrets:
       - VITE_MAPBOX_TOKEN
-      - VITE_SENTRY_DSN
-      - VITE_ANALYTICS_WEBSITE_ID
-      - VITE_GTM_ID
+      # Publishable ingest key (hanzo/deploy/PUBLISHABLE_KEY, env=prod). Without it
+      # every logged-out pageview and error is refused 401 at the door.
+      - PUBLISHABLE_KEY
 
-# Deploy: roll the freshly-built image onto the `world` Service CR. Fires only
-# on `main` (+ tags); PRs and forks build but never deploy. KMS hands back the
-# kubeconfig at run time.
-deploy:
-  cluster: do-sfo3-hanzo-k8s
-  namespace: hanzo
-  # Quoted to dodge YAML 1.1 boolean coercion of a bare `on:` key.
-  "on": [main]
-  services:
-    - name: world
-      image: world
-
-# KMS (kms.hanzo.ai, Universal Auth) supplies the GHCR push token and the
-# target kubeconfig at run time. Only KMS_CLIENT_ID/KMS_CLIENT_SECRET live in
-# GitHub; everything else is fetched here.
+# NO `deploy:` BLOCK, and that is the whole point — cd.hanzo.ai owns rollout.
+#
+# This repo said so already, in release.yml's own header: "ROLLOUT IS NOT HERE.
+# This cuts an image + a git tag. Deploying is a reviewed pin bump in
+# hanzoai/universe, applied by cd.hanzo.ai — the App CR is ArgoCD-managed
+# (selfHeal), so a `kubectl patch` from CI is reverted on the next poll."
+# A `deploy:` block here contradicted that and lost: it failed every run needing
+# a kubeconfig it could not use, and had it succeeded, selfHeal would have
+# reverted it within one poll.
+#
+# Measured, so nobody has to take it on faith: the `world` Deployment carries
+# `apps.hanzo.ai/installation-id: hanzo-cd`, its Application has
+# `syncPolicy.automated.selfHeal: true`, its source is
+# `charts/app` + `values/hanzo/world.yaml` in hanzoai/universe, and the running
+# image is exactly the digest pinned there. Sync: Synced, Health: Healthy.
+#
+# So: to ship world, bump `tag:` AND `digest:` in that values file. One way to
+# deploy, not two.
+#
+# KMS (kms.hanzo.ai, Universal Auth) still supplies the GHCR push token and the
+# build_secrets at run time. Only KMS_CLIENT_ID/KMS_CLIENT_SECRET live as CI
+# secrets; everything else is fetched here.
 kms:
   path: /deploy
   environment: prod

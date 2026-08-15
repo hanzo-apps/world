@@ -1,12 +1,12 @@
 import { getCachedJson, setCachedJson, hashString } from './_upstash-cache.js';
+import { HANZO_API_URL, FAST_MODEL, hanzoKey } from './_hanzo-ai.js';
 import { getCorsHeaders, isDisallowedOrigin } from './_cors.js';
 
 export const config = {
   runtime: 'edge',
 };
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const MODEL = 'llama-3.1-8b-instant';
+const MODEL = FAST_MODEL;
 const CACHE_TTL_SECONDS = 86400;
 const CACHE_VERSION = 'v1';
 
@@ -38,9 +38,9 @@ export default async function handler(request) {
     });
   }
 
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = hanzoKey();
   if (!apiKey) {
-    return new Response(JSON.stringify({ fallback: true, skipped: true, reason: 'GROQ_API_KEY not configured' }), {
+    return new Response(JSON.stringify({ fallback: true, skipped: true, reason: 'HANZO_API_KEY not configured' }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
@@ -84,7 +84,7 @@ ${isTech ? 'Focus: technology, startups, AI, cybersecurity. Most tech news is "l
 
 Return: {"level":"...","category":"..."}`;
 
-    const response = await fetch(GROQ_API_URL, {
+    const response = await fetch(HANZO_API_URL, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -102,7 +102,7 @@ Return: {"level":"...","category":"..."}`;
     });
 
     if (!response.ok) {
-      console.error('[Classify] Groq error:', response.status);
+      console.error('[Classify] model error:', response.status);
       return new Response(JSON.stringify({ fallback: true }), {
         status: response.status,
         headers: { 'Content-Type': 'application/json' },

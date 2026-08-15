@@ -46,6 +46,24 @@ COPY . .
 # is same-origin, resolved in the browser).
 ARG VITE_MAPBOX_TOKEN
 ENV VITE_MAPBOX_TOKEN=$VITE_MAPBOX_TOKEN
+# Publishable ingest key for anonymous telemetry. Same KMS name as the rest of the
+# fleet (hanzo/deploy/PUBLISHABLE_KEY); VITE_ is what makes Vite inline it and is a
+# property of THIS build, so it is applied here and the store keeps one plain name.
+# Signed-in visitors are still attributed by their own bearer — telemetry.ts passes
+# this as the fallback, never as the config `ingestKey`, which would statically
+# override the user.
+ARG PUBLISHABLE_KEY
+ENV VITE_PUBLISHABLE_KEY=$PUBLISHABLE_KEY
+# Fail CLOSED, and gate here because this is the one path every builder passes
+# through — a guard in one workflow protects that lane only, and this repo has
+# two. An empty key builds, serves, and looks correct while every anonymous
+# pageview and error is refused 401 at the door, which is exactly what 2.9.55
+# shipped: the ARG existed, no lane supplied it, and nothing said so.
+RUN case "$PUBLISHABLE_KEY" in \
+      pk-*) : ;; \
+      '')   echo "PUBLISHABLE_KEY is empty - pass --build-arg PUBLISHABLE_KEY=<pk-...> (KMS deploy/PUBLISHABLE_KEY, env prod)" >&2; exit 1 ;; \
+      *)    echo "PUBLISHABLE_KEY is not a publishable key (expected a pk- prefix)" >&2; exit 1 ;; \
+    esac
 # The version the builder is CUTTING, so the bundle self-reports the tag it ships
 # under. release.yml is the one place a release number is decided; package.json is
 # only the local-dev fallback (see the __APP_VERSION__ note in vite.config.ts).
