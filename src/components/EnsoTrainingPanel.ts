@@ -7,7 +7,7 @@ import { fmtCompact, fmtPct, fmtAgo, statTile, sparkline } from '@/utils/cloud-f
 // Enso Live Training — a live window into the learned router that Hanzo trains on
 // its own routing decisions. The AGGREGATES are the PUBLIC platform telemetry
 // (/v1/world/cloud/router-stats → ai /v1/router/stats?scope=platform): throughput,
-// learned-engine share, a blended-price cost-saved proxy and the last retrain gate.
+// learned share, a blended-price cost-saved proxy and the last retrain gate.
 // The MODELS it serves and trains across are the REAL served catalog
 // (/v1/world/cloud/models → ai /v1/models): real model names, tiers, context and
 // pricing — never opaque "arm-N" labels or fabricated numbers (the platform relabels
@@ -15,7 +15,7 @@ import { fmtCompact, fmtPct, fmtAgo, statTile, sparkline } from '@/utils/cloud-f
 // meaningless arm mix). An unreachable feed shows a muted "connecting…".
 
 /** Normalize a metric that may arrive as a 0..1 fraction OR an already-scaled
- * percent into a 0..100 percent. engine_share/shadow_agreement are fractions;
+ * percent into a 0..100 percent. learned_share/shadow_agreement are fractions;
  * being defensive keeps the display honest if the upstream units shift. */
 function pctOf(v: number): number {
   return Math.abs(v) <= 1 ? v * 100 : v;
@@ -46,7 +46,7 @@ export class EnsoTrainingPanel extends Panel {
       showCount: false,
       className: 'cloud-panel',
       infoTooltip:
-        'Hanzo Cloud — the learned router, live. Platform-wide aggregates from the router that continually retrains on its own routing decisions (throughput, learned-engine share, a blended-price cost-saved proxy, the latest retrain gate), plus the REAL model catalog it serves and trains across — real names, tiers, context and pricing from the public /v1/models. No fabricated numbers.',
+        'Hanzo Cloud — the learned router, live. Platform-wide aggregates from the router that continually retrains on its own routing decisions (throughput, learned share, a blended-price cost-saved proxy, the latest retrain gate), plus the REAL model catalog it serves and trains across — real names, tiers, context and pricing from the public /v1/models. No fabricated numbers.',
     });
     void this.fetchData();
     this.timer = setInterval(() => void this.fetchData(), 30_000);
@@ -132,7 +132,7 @@ export class EnsoTrainingPanel extends Panel {
 
     const tiles = [
       statTile(fmtPct(s.cost.saved_pct, 1), 'cost saved', `last ${this.hours}h`),
-      statTile(fmtPct(pctOf(q.engine_share), 0), 'learned-engine share', 'vs heuristic'),
+      statTile(fmtPct(pctOf(q.learned_share), 0), 'learned share', 'vs static seed'),
       statTile(fmtCompact(s.window.events), `events · ${this.hours}h`),
     ].join('');
 

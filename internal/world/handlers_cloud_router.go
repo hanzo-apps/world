@@ -27,7 +27,7 @@ import (
 // routerStatsUnavailable is the honest empty payload served when the upstream
 // cannot be reached. Structurally valid so the client parses it cleanly; the
 // unavailable flag tells the panel to show "connecting…" rather than zeros.
-var routerStatsUnavailable = json.RawMessage(`{"scope":"platform","unavailable":true,"window":{"since":"","until":"","events":0},"cost":{"saved_pct":0,"cumulative_saved_index":0,"baseline_model":"","priced_events":0},"quality":{"reward_rate":0,"rewarded_events":0,"engine_share":0,"avg_confidence":0,"shadow_agreement":null},"by_task":{},"by_model":{},"throughput":{"per_hour":[],"total_window":0},"retrain":null}`)
+var routerStatsUnavailable = json.RawMessage(`{"scope":"platform","unavailable":true,"window":{"since":"","until":"","events":0},"cost":{"saved_pct":0,"cumulative_saved_index":0,"baseline_model":"","priced_events":0},"quality":{"reward_rate":0,"rewarded_events":0,"learned_share":0,"avg_confidence":0,"shadow_agreement":null},"by_task":{},"by_model":{},"by_source":{},"throughput":{"per_hour":[],"total_window":0},"retrain":null}`)
 
 // clampHours parses ?hours= and clamps it to [1,168] (default 24). The value is
 // forwarded to the upstream and keys the cache so each window caches separately.

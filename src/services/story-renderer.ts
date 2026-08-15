@@ -36,15 +36,20 @@ const THREAT_COLORS: Record<string, string> = {
   critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#22c55e', info: '#3b82f6',
 };
 
-const LOGO_URL = '/favico/worldmonitor-icon-1024.png';
+// The Hanzo mark: the flat five-block H on its native 67-unit grid, the variant
+// @hanzo/logo draws at small sizes and the same geometry as public/favico/hanzo-favicon.svg.
+// Drawn as a path rather than fetched as an image so it is crisp at any size, holds
+// the colour the lockup asks for, and cannot be missing when a story renders.
+const MARK = 'M22.21 0H0V22.3184H22.21V0ZM66.7198 0H44.5098V22.3184H66.7198V0ZM66.7038 22.3184H22.2534L0.0878906 44.6367H44.4634L66.7038 22.3184ZM22.21 67V44.6369H0V67H22.21ZM66.7198 67V44.6369H44.5098V67H66.7198Z';
+const MARK_GRID = 67;
 
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
+function drawMark(ctx: CanvasRenderingContext2D, x: number, top: number, size: number, color: string): void {
+  ctx.save();
+  ctx.translate(x, top);
+  ctx.scale(size / MARK_GRID, size / MARK_GRID);
+  ctx.fillStyle = color;
+  ctx.fill(new Path2D(MARK));
+  ctx.restore();
 }
 
 export async function renderStoryToCanvas(data: StoryData): Promise<HTMLCanvasElement> {
@@ -53,9 +58,6 @@ export async function renderStoryToCanvas(data: StoryData): Promise<HTMLCanvasEl
   canvas.height = H;
   const ctx = canvas.getContext('2d')!;
 
-  let logoImg: HTMLImageElement | null = null;
-  try { logoImg = await loadImage(LOGO_URL); } catch { /* proceed without logo */ }
-
   // Background — slightly lighter for better contrast
   ctx.fillStyle = '#0c0c14';
   ctx.fillRect(0, 0, W, H);
@@ -63,18 +65,21 @@ export async function renderStoryToCanvas(data: StoryData): Promise<HTMLCanvasEl
   let y = 0;
   const PAD = 72;
   const RIGHT = W - PAD;
-  const LOGO_SIZE = 48;
+  const MARK_SIZE = 32;
+  const MARK_GAP = 16;
 
   // ── HEADER ──
   y = 60;
-  if (logoImg) {
-    ctx.drawImage(logoImg, PAD, y - 4, LOGO_SIZE, LOGO_SIZE);
-  }
-  const textX = logoImg ? PAD + LOGO_SIZE + 14 : PAD;
-  ctx.fillStyle = '#666';
+  const brandY = y + 26;
   ctx.font = '700 30px Inter, system-ui, sans-serif';
+  // Sit the mark on the wordmark's cap band. Measured, not assumed, so the lockup
+  // stays centred whichever face the platform resolves for the stack.
+  const brandCap = ctx.measureText('H').actualBoundingBoxAscent;
+  drawMark(ctx, PAD, brandY - brandCap / 2 - MARK_SIZE / 2, MARK_SIZE, '#666');
+  const textX = PAD + MARK_SIZE + MARK_GAP;
+  ctx.fillStyle = '#666';
   ctx.letterSpacing = '6px';
-  ctx.fillText('WORLDMONITOR', textX, y + 26);
+  ctx.fillText('HANZO WORLD', textX, brandY);
   ctx.letterSpacing = '0px';
   const dateStr = new Date().toLocaleDateString(getLocale(), { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
   ctx.font = '400 24px Inter, system-ui, sans-serif';
@@ -429,15 +434,16 @@ export async function renderStoryToCanvas(data: StoryData): Promise<HTMLCanvasEl
   ctx.lineTo(RIGHT, H - 90);
   ctx.stroke();
 
-  const footerLogoSize = 40;
-  if (logoImg) {
-    ctx.drawImage(logoImg, PAD, H - 78, footerLogoSize, footerLogoSize);
-  }
-  const footerTextX = logoImg ? PAD + footerLogoSize + 12 : PAD;
-  ctx.fillStyle = '#444';
+  // The signature is two stacked lines; centre the mark on the block they span.
   ctx.font = '600 24px Inter, system-ui, sans-serif';
+  const sigCap = ctx.measureText('H').actualBoundingBoxAscent;
+  const sigTop = H - 55 - sigCap;
+  const sigBottom = H - 30;
+  drawMark(ctx, PAD, (sigTop + sigBottom) / 2 - MARK_SIZE / 2, MARK_SIZE, '#444');
+  const footerTextX = PAD + MARK_SIZE + MARK_GAP;
+  ctx.fillStyle = '#444';
   ctx.letterSpacing = '2px';
-  ctx.fillText('WORLDMONITOR.APP', footerTextX, H - 55);
+  ctx.fillText('WORLD.HANZO.AI', footerTextX, H - 55);
   ctx.letterSpacing = '0px';
   ctx.font = '400 20px Inter, system-ui, sans-serif';
   ctx.fillText('Real-time global intelligence monitoring', footerTextX, H - 30);

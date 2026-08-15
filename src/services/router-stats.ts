@@ -25,7 +25,7 @@ export interface RouterCost {
 export interface RouterQuality {
   reward_rate: number;
   rewarded_events: number;
-  engine_share: number;
+  learned_share: number;
   avg_confidence: number;
   shadow_agreement: number | null;
 }
@@ -63,6 +63,7 @@ export interface RouterStats {
   quality: RouterQuality;
   by_task: Record<string, RouterTask>;
   by_model: Record<string, number>;
+  by_source: Record<string, number>;
   throughput: RouterThroughput;
   retrain: RouterRetrain | null;
 }

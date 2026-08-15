@@ -2,8 +2,6 @@ import { isDesktopRuntime } from './runtime';
 import { invokeTauri } from './tauri-bridge';
 
 export type RuntimeSecretKey =
-  | 'GROQ_API_KEY'
-  | 'OPENROUTER_API_KEY'
   | 'FRED_API_KEY'
   | 'EIA_API_KEY'
   | 'CLOUDFLARE_API_TOKEN'
@@ -22,8 +20,7 @@ export type RuntimeSecretKey =
   | 'UC_DP_KEY';
 
 export type RuntimeFeatureId =
-  | 'aiGroq'
-  | 'aiOpenRouter'
+  | 'aiSummary'
   | 'economicFred'
   | 'energyEia'
   | 'internetOutages'
@@ -61,8 +58,7 @@ const SIDECAR_ENV_UPDATE_URL = 'http://127.0.0.1:46123/v1/world/local-env-update
 const SIDECAR_SECRET_VALIDATE_URL = 'http://127.0.0.1:46123/v1/world/local-validate-secret';
 
 const defaultToggles: Record<RuntimeFeatureId, boolean> = {
-  aiGroq: true,
-  aiOpenRouter: true,
+  aiSummary: true,
   economicFred: true,
   energyEia: true,
   internetOutages: true,
@@ -79,18 +75,11 @@ const defaultToggles: Record<RuntimeFeatureId, boolean> = {
 
 export const RUNTIME_FEATURES: RuntimeFeatureDefinition[] = [
   {
-    id: 'aiGroq',
-    name: 'Groq summarization',
-    description: 'Primary fast LLM provider used for AI summary generation.',
-    requiredSecrets: ['GROQ_API_KEY'],
-    fallback: 'Falls back to OpenRouter, then local browser model.',
-  },
-  {
-    id: 'aiOpenRouter',
-    name: 'OpenRouter summarization',
-    description: 'Secondary LLM provider for AI summary fallback.',
-    requiredSecrets: ['OPENROUTER_API_KEY'],
-    fallback: 'Falls back to local browser model only.',
+    id: 'aiSummary',
+    name: 'AI summaries',
+    description: 'Headline summaries, generated on the Hanzo gateway.',
+    requiredSecrets: [],
+    fallback: 'Falls back to the local browser model.',
   },
   {
     id: 'economicFred',

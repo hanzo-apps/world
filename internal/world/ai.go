@@ -16,7 +16,6 @@ import (
 // fails, the handlers degrade cleanly (the SPA has a local fallback).
 type AIClient struct {
 	base  string
-	key   string
 	model string
 }
 
@@ -35,7 +34,6 @@ func newAIClient() *AIClient {
 	}
 	return &AIClient{
 		base:  strings.TrimRight(base, "/"),
-		key:   env("HANZO_AI_KEY", "HANZO_API_KEY", "HANZO_AI_TOKEN"),
 		model: model,
 	}
 }
@@ -57,18 +55,21 @@ func userBearer(r *http.Request) string {
 	return ""
 }
 
-// bearerFor returns the Authorization value to use for an inference call. The
-// signed-in user's IAM token is preferred (metered to their org/project/billing);
-// a.key is only a fallback for keyed self-host/dev deployments (env HANZO_AI_KEY),
-// never the path for a normal metered user on world.hanzo.ai.
+// bearerFor returns the Authorization value for an inference call: the acting
+// person's IAM token, or nothing at all.
+//
+// There is no service-key fallback, because inference is metered to the org the
+// bearer names — one key standing in for every signed-out visitor bills all of
+// them to whoever owns it, and gives AI away to people who have not signed in or
+// chosen a plan. Callers already read an empty bearer as "sign in to enable AI
+// insights" and answer 200 with that, so signed-out visitors get a prompt rather
+// than an error.
+//
+// The key that used to sit here was a retired `hk-` credential the gateway had
+// been answering 401 to for weeks. Nothing alerted, because a dead fallback and
+// an absent one look identical from the outside.
 func (a *AIClient) bearerFor(r *http.Request) string {
-	if b := userBearer(r); b != "" {
-		return b
-	}
-	if a.key != "" {
-		return "Bearer " + a.key
-	}
-	return ""
+	return userBearer(r)
 }
 
 // Tenant-selector headers the cloud gateway reads to scope a bearer call to a

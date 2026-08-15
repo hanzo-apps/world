@@ -202,7 +202,7 @@
       "loadingIndex": "Carregando índice...",
       "loadingMarkets": "Carregando mercados de previsão...",
       "generatingBrief": "Gerando resumo de inteligência...",
-      "unavailable": "Resumo de IA indisponível – configure GROQ_API_KEY em Configurações.",
+      "unavailable": "Resumo de IA indisponível – configure Hanzo AI em Configurações.",
       "cached": "em cache",
       "fresh": "Fresco",
       "noMarkets": "Nenhum mercado de previsão encontrado",
@@ -239,7 +239,7 @@
       "predictionMarkets": "Mercados de previsão",
       "loadingMarkets": "Carregando mercados de previsão...",
       "infrastructure": "Exposição de infraestrutura",
-      "briefUnavailable": "Resumo de IA indisponível – configure GROQ_API_KEY em Configurações.",
+      "briefUnavailable": "Resumo de IA indisponível – configure Hanzo AI em Configurações.",
       "cached": "em cache",
       "fresh": "Fresco",
       "noMarkets": "Nenhum mercado de previsão encontrado",
@@ -763,7 +763,7 @@
       "noRisks": "Nenhum risco significativo detectado"
     },
     "insights": {
-      "infoTooltip": "<strong>Análise baseada em IA</strong><br>• <strong>World Brief</strong>: Resumo de IA (Groq/OpenRouter)<br>• <strong>Sentiment</strong>: Análise do tom de notícias<br>• <strong>Velocity</strong>: Histórias em movimento rápido<br>• <strong>Focal Pontos</strong>: correlaciona entidades de notícias com sinais de mapa (militares, protestos, interrupções)<br><em>Somente desktop • Desenvolvido por Llama 3.3 + Detecção de ponto focal</em>",
+      "infoTooltip": "<strong>Análise baseada em IA</strong><br>• <strong>World Brief</strong>: Resumo de IA (Hanzo)<br>• <strong>Sentiment</strong>: Análise do tom de notícias<br>• <strong>Velocity</strong>: Histórias em movimento rápido<br>• <strong>Focal Pontos</strong>: correlaciona entidades de notícias com sinais de mapa (militares, protestos, interrupções)<br><em>Somente desktop • Desenvolvido por Llama 3.3 + Detecção de ponto focal</em>",
       "noStories": "Nenhuma matéria de destaque ainda"
     },
     "techHubs": {
@@ -1471,7 +1471,7 @@
     "predictionMarkets": "Mercados de Previsão",
     "loadingMarkets": "Carregando mercados de previsão...",
     "infrastructure": "Exposição de Infraestrutura",
-    "briefUnavailable": "Resumo de IA indisponível — configure GROQ_API_KEY em Configurações.",
+    "briefUnavailable": "Resumo de IA indisponível — configure Hanzo AI em Configurações.",
     "cached": "Em cache",
     "fresh": "Atualizado",
     "noMarkets": "Nenhum mercado de previsão encontrado",

@@ -17,7 +17,7 @@
     "predictionMarkets": "予測市場",
     "loadingMarkets": "予測市場を読み込み中...",
     "infrastructure": "インフラ露出度",
-    "briefUnavailable": "AIブリーフ利用不可 — 設定でGROQ_API_KEYを構成してください。",
+    "briefUnavailable": "AIブリーフ利用不可 — 設定でHanzo AIを構成してください。",
     "cached": "キャッシュ済",
     "fresh": "最新",
     "noMarkets": "予測市場が見つからない",
@@ -311,7 +311,7 @@
       "fresh": "最新",
       "noMarkets": "予測市場が見つからない",
       "predictionMarkets": "予測市場",
-      "unavailable": "AIブリーフ利用不可 — 設定でGROQ_API_KEYを構成してください。"
+      "unavailable": "AIブリーフ利用不可 — 設定でHanzo AIを構成してください。"
     },
     "countryBrief": {
       "identifying": "国を特定中...",
@@ -327,7 +327,7 @@
       "predictionMarkets": "予測市場",
       "loadingMarkets": "予測市場を読み込み中...",
       "infrastructure": "インフラ露出度",
-      "briefUnavailable": "AIブリーフ利用不可 — 設定でGROQ_API_KEYを構成してください。",
+      "briefUnavailable": "AIブリーフ利用不可 — 設定でHanzo AIを構成してください。",
       "cached": "キャッシュ済",
       "fresh": "最新",
       "noMarkets": "予測市場が見つからない",
@@ -707,7 +707,7 @@
     },
     "insights": {
       "noStories": "速報またはマルチソースストーリーはまだなし",
-      "infoTooltip": "<strong>AI分析</strong><br>• <strong>世界ブリーフ</strong>: AI要約（Groq/OpenRouter）<br>• <strong>センチメント</strong>: ニュースのトーン分析<br>• <strong>速度</strong>: 急速に広がるストーリー<br>• <strong>焦点</strong>: ニュースエンティティとマップシグナル（軍事、抗議、障害）を相関<br><em>デスクトップ版のみ・Llama 3.3 + 焦点検出搭載</em>"
+      "infoTooltip": "<strong>AI分析</strong><br>• <strong>世界ブリーフ</strong>: AI要約（Hanzo）<br>• <strong>センチメント</strong>: ニュースのトーン分析<br>• <strong>速度</strong>: 急速に広がるストーリー<br>• <strong>焦点</strong>: ニュースエンティティとマップシグナル（軍事、抗議、障害）を相関<br><em>デスクトップ版のみ・Llama 3.3 + 焦点検出搭載</em>"
     },
     "cascade": {
       "noImpacts": "国への影響未検出",

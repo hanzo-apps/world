@@ -12,7 +12,7 @@ export interface RouterDaily {
   rewarded_events: number;
   cost_saved_index: number;
   cumulative_cost_saved: number;
-  engine_share: number;
+  learned_share: number;
   by_task: Record<string, number>;
 }
 

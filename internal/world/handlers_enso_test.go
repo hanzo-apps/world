@@ -89,8 +89,19 @@ func TestEnsoTrainingLiveFold(t *testing.T) {
 		t.Fatalf("want state=live, got %q", et.State)
 	}
 	l := et.Ledger
-	if !l.Available || l.Total != 4 || l.Engine != 2 || l.Heuristic != 2 || l.EnginePct != 50 {
+	if !l.Available || l.Total != 4 {
 		t.Fatalf("bad ledger mix: %+v", l)
+	}
+	// The mix is reported as a histogram over EVERY source, so a strategy that
+	// never fires is visible and none is silently discarded.
+	wantSources := map[string]int{"engine": 2, "heuristic": 2}
+	if len(l.BySource) != len(wantSources) {
+		t.Fatalf("bySource = %+v, want %v", l.BySource, wantSources)
+	}
+	for _, c := range l.BySource {
+		if wantSources[c.Name] != c.Count {
+			t.Fatalf("bySource %q = %d, want %d", c.Name, c.Count, wantSources[c.Name])
+		}
 	}
 	if l.AvgConfidence != 0.63 {
 		t.Fatalf("want avgConfidence 0.63, got %v", l.AvgConfidence)

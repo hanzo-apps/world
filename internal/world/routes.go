@@ -210,6 +210,13 @@ func (s *Server) mount(mux registrar) {
 	mux.HandleFunc("/v1/world/enso-benchmarks", s.handleEnsoBenchmarks)
 
 	// AI (Hanzo inference)
+	// The canonical name. One handler, one route — it always ran on Hanzo
+	// inference, so the two vendor-named paths below were never two providers:
+	// they were the same request twice, and the client's "Groq success" log
+	// came from the ROUTE NAME rather than from anything Groq did.
+	mux.HandleFunc("/v1/world/summarize", s.handleSummarize)
+	// Kept so an older cached bundle does not 404 mid-rollout. Delete once no
+	// client asks for them.
 	mux.HandleFunc("/v1/world/groq-summarize", s.handleSummarize)
 	mux.HandleFunc("/v1/world/openrouter-summarize", s.handleSummarize)
 	mux.HandleFunc("/v1/world/classify-batch", s.handleClassifyBatch)

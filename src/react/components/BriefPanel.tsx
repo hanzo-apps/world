@@ -23,7 +23,7 @@ import type { PanelSlot } from './PanelGrid';
 
 /**
  * BriefPanel — the vanilla `BriefPanel` (src/components/BriefPanel.ts) ported onto
- * the React Panel chassis. The AI world/tech brief: a Groq/OpenRouter summary over
+ * the React Panel chassis. The AI world/tech brief: a Hanzo-generated summary over
  * the top-ranked breaking stories, per-story sentiment + velocity badges, a
  * sentiment overview bar, the coverage stats, and — in the `full` variant — the
  * geographic convergence zones + focal points that correlate news entities with map
@@ -59,7 +59,7 @@ const BRIEF_CACHE_KEY = 'summary:world-brief';
 const REFRESH_MS = BRIEF_COOLDOWN_MS;
 
 const INFO_TOOLTIP =
-  'AI-powered analysis. World Brief: AI summary (Groq/OpenRouter). Sentiment: news tone. ' +
+  'AI-powered analysis. World Brief: AI summary. Sentiment: news tone. ' +
   'Velocity: fast-moving stories. Focal Points: correlates news entities with map signals ' +
   '(military, protests, outages). Desktop only.';
 

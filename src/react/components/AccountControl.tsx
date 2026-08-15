@@ -11,7 +11,7 @@ import {
 import { identifyUser } from '../telemetry';
 
 /**
- * AccountControl — the far-right identity affordance handed to HanzoAppHeader's
+ * AccountControl — the far-right identity affordance handed to OrgHeader's
  * `account` slot.
  *
  * Signed out: a "Sign in" pill that hands off to hanzo.id OIDC. Signed in: the
