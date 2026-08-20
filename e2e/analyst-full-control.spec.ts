@@ -101,7 +101,7 @@ test.describe('analyst full app control', () => {
 
     // And it persisted through the ONE monitor path (localStorage mirror).
     const stored = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('worldmonitor-monitors') || '[]'),
+      JSON.parse(localStorage.getItem('world-monitors') || '[]'),
     );
     expect(JSON.stringify(stored)).toContain('nvidia');
   });

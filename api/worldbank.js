@@ -80,7 +80,7 @@ export default async function handler(request) {
     const response = await fetch(wbUrl, {
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (compatible; WorldMonitor/1.0; +https://world.hanzo.ai)',
+        'User-Agent': 'Mozilla/5.0 (compatible; HanzoWorld/1.0; +https://world.hanzo.ai)',
       },
     });
 

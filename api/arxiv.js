@@ -21,7 +21,7 @@ export default async function handler(request) {
 
     const response = await fetch(apiUrl, {
       headers: {
-        'User-Agent': 'WorldMonitor/1.0 (AI Research Tracker)',
+        'User-Agent': 'HanzoWorld/1.0 (AI Research Tracker)',
       },
     });
 

@@ -38,23 +38,23 @@ const GROUPS: SyncGroup[] = [
     sharedEndpoint: '/v1/world/dashboard/shared',
     fixed: [
       'panel-order',
-      'worldmonitor-panels',
-      'worldmonitor-layers',
-      'worldmonitor-disabled-feeds',
-      'worldmonitor-panel-spans',
-      'worldmonitor-panel-cols',
+      'world-panels',
+      'world-layers',
+      'world-disabled-feeds',
+      'world-panel-spans',
+      'world-panel-cols',
       'hanzo-world-custom-panels',
       'hanzo-world-map-mode',
       'hanzo-world-ui-scale', // text-size / UI scale (accessibility)
       'hanzo-world-grid-size', // dock cell-size fallback
     ],
-    prefix: 'worldmonitor-layout:', // per-variant free geometry + mode
+    prefix: 'world-layout:', // per-variant free geometry + mode
     timer: null,
   },
   {
     endpoint: '/v1/world/history',
     fixed: [
-      'worldmonitor_recent_searches', // SearchModal recent searches
+      'world_recent_searches', // SearchModal recent searches
       'hanzo-world-watch-queue', // watch queue + watched status
     ],
     timer: null,

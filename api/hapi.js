@@ -60,7 +60,7 @@ export default async function handler(req) {
   }
 
   try {
-    const appId = btoa('worldmonitor:monitor@world.hanzo.ai');
+    const appId = btoa('world:monitor@world.hanzo.ai');
     const response = await fetch(
       `https://hapi.humdata.org/api/v2/coordination-context/conflict-events?output_format=json&limit=1000&offset=0&app_identifier=${appId}`,
       {

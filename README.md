@@ -27,7 +27,7 @@
   <a href="https://github.com/hanzoai/world/releases/latest"><strong>All Releases</strong></a>
 </p>
 
-![Hanzo World Dashboard](new-world-monitor.png)
+![Hanzo World Dashboard](new-world.png)
 
 ---
 
@@ -647,18 +647,18 @@ This is an approximation, not a substitute for official flow data, but it captur
 
 A single codebase produces three specialized dashboards, each with distinct feeds, panels, map layers, and branding:
 
-| Aspect | World Monitor | Tech Monitor | Finance Monitor |
+| Aspect | Hanzo World | Tech Monitor | Finance Monitor |
 |--------|--------------|--------------|-----------------|
 | **Domain** | world.hanzo.ai | world.hanzo.ai | world.hanzo.ai |
 | **Focus** | Geopolitics, military, conflicts | AI/ML, startups, cybersecurity | Markets, trading, central banks |
 | **RSS Feeds** | ~25 categories (politics, MENA, Africa, think tanks) | ~20 categories (AI, VC blogs, startups, GitHub) | ~18 categories (forex, bonds, commodities, IPOs) |
 | **Panels** | 44 (strategic posture, CII, cascade) | 31 (AI labs, unicorns, accelerators) | 30 (forex, bonds, derivatives, institutional) |
 | **Unique Map Layers** | Military bases, nuclear facilities, hotspots | Tech HQs, cloud regions, startup hubs | Stock exchanges, central banks, Gulf investments |
-| **Desktop App** | World Monitor.app / .exe | Tech Monitor.app / .exe | Finance Monitor.app / .exe |
+| **Desktop App** | Hanzo World.app / .exe | Tech Monitor.app / .exe | Finance Monitor.app / .exe |
 
 **Build-time selection** — the `VITE_VARIANT` environment variable controls which configuration is bundled. A Vite HTML plugin transforms meta tags, Open Graph data, PWA manifest, and JSON-LD structured data at build time. Each variant tree-shakes unused data files — the finance build excludes military base coordinates and APT group data, while the geopolitical build excludes stock exchange listings.
 
-**Runtime switching** — a variant selector in the header bar (🌍 WORLD | 💻 TECH | 📈 FINANCE) navigates between deployed domains on the web, or sets `localStorage['worldmonitor-variant']` in the desktop app to switch without rebuilding.
+**Runtime switching** — a variant selector in the header bar (🌍 WORLD | 💻 TECH | 📈 FINANCE) navigates between deployed domains on the web, or sets `localStorage['world-variant']` in the desktop app to switch without rebuilding.
 
 ---
 
@@ -698,7 +698,7 @@ Feeds also carry a **propaganda risk rating** and **state affiliation flag**. St
 
 ## Edge Function Architecture
 
-World Monitor uses 60+ Vercel Edge Functions as a lightweight API layer. Each edge function handles a single data source concern — proxying, caching, or transforming external APIs. This architecture avoids a monolithic backend while keeping API keys server-side:
+Hanzo World uses 60+ Vercel Edge Functions as a lightweight API layer. Each edge function handles a single data source concern — proxying, caching, or transforming external APIs. This architecture avoids a monolithic backend while keeping API keys server-side:
 
 - **RSS Proxy** — domain-allowlisted proxy for 100+ feeds, preventing CORS issues and hiding origin servers. Feeds from domains that block Vercel IPs are automatically routed through the Railway relay.
 - **AI Pipeline** — Groq and OpenRouter edge functions with Redis deduplication, so identical headlines across concurrent users only trigger one LLM call. The classify-event endpoint pauses its queue on 500 errors to avoid wasting API quota.
@@ -929,7 +929,7 @@ See [`.env.example`](./.env.example) for the complete list with registration lin
 
 ## Self-Hosting
 
-World Monitor relies on **60+ Vercel Edge Functions** in the `api/` directory for RSS proxying, data caching, and API key isolation. Running `npm run dev` alone starts only the Vite frontend — the edge functions won't execute, and most panels (news feeds, markets, AI summaries) will be empty.
+Hanzo World relies on **60+ Vercel Edge Functions** in the `api/` directory for RSS proxying, data caching, and API key isolation. Running `npm run dev` alone starts only the Vite frontend — the edge functions won't execute, and most panels (news feeds, markets, AI summaries) will be empty.
 
 ### Option 1: Deploy to Vercel (Recommended)
 
@@ -1026,10 +1026,10 @@ npm run build:finance   # Build finance variant
 npm run typecheck    # TypeScript type checking
 
 # Desktop packaging
-npm run desktop:package:macos:full      # .app + .dmg (World Monitor)
+npm run desktop:package:macos:full      # .app + .dmg (Hanzo World)
 npm run desktop:package:macos:tech      # .app + .dmg (Tech Monitor)
 npm run desktop:package:macos:finance   # .app + .dmg (Finance Monitor)
-npm run desktop:package:windows:full    # .exe + .msi (World Monitor)
+npm run desktop:package:windows:full    # .exe + .msi (Hanzo World)
 npm run desktop:package:windows:tech    # .exe + .msi (Tech Monitor)
 npm run desktop:package:windows:finance # .exe + .msi (Finance Monitor)
 
@@ -1104,7 +1104,7 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 ## Authors
 
-**Hanzo World** is maintained by **Hanzo AI, Inc.** — fork of the original **World Monitor** by **Elie Habib** ([GitHub](https://github.com/koala73)), used under the MIT License. See [NOTICE](./NOTICE).
+**Hanzo World** is maintained by **Hanzo AI, Inc.** — fork of the original **Hanzo World** by **Elie Habib** ([GitHub](https://github.com/koala73)), used under the MIT License. See [NOTICE](./NOTICE).
 
 ---
 

@@ -53,7 +53,7 @@ export interface RuntimeConfig {
   secrets: Partial<Record<RuntimeSecretKey, RuntimeSecretState>>;
 }
 
-const TOGGLES_STORAGE_KEY = 'worldmonitor-runtime-feature-toggles';
+const TOGGLES_STORAGE_KEY = 'world-runtime-feature-toggles';
 const SIDECAR_ENV_UPDATE_URL = 'http://127.0.0.1:46123/v1/world/local-env-update';
 const SIDECAR_SECRET_VALIDATE_URL = 'http://127.0.0.1:46123/v1/world/local-validate-secret';
 

@@ -247,13 +247,13 @@ export class App {
     const defaultLayers = this.isMobile ? MOBILE_DEFAULT_MAP_LAYERS : DEFAULT_MAP_LAYERS;
 
     // Check if variant changed - reset all settings to variant defaults
-    const storedVariant = localStorage.getItem('worldmonitor-variant');
+    const storedVariant = localStorage.getItem('world-variant');
     const currentVariant = SITE_VARIANT;
     console.log(`[App] Variant check: stored="${storedVariant}", current="${currentVariant}"`);
     if (storedVariant !== currentVariant) {
       // Variant changed - use defaults for new variant, clear old settings
       console.log('[App] Variant changed - resetting to defaults');
-      localStorage.setItem('worldmonitor-variant', currentVariant);
+      localStorage.setItem('world-variant', currentVariant);
       localStorage.removeItem(STORAGE_KEYS.mapLayers);
       localStorage.removeItem(STORAGE_KEYS.panels);
       localStorage.removeItem(this.PANEL_ORDER_KEY);
@@ -269,7 +269,7 @@ export class App {
 
       // One-time migration: reorder panels for existing users (v1.9 panel layout)
       // Puts live-news, insights, strategic-posture, cii, strategic-risk at the top
-      const PANEL_ORDER_MIGRATION_KEY = 'worldmonitor-panel-order-v1.9';
+      const PANEL_ORDER_MIGRATION_KEY = 'world-panel-order-v1.9';
       if (!localStorage.getItem(PANEL_ORDER_MIGRATION_KEY)) {
         const savedOrder = localStorage.getItem(this.PANEL_ORDER_KEY);
         if (savedOrder) {
@@ -296,7 +296,7 @@ export class App {
 
       // Tech variant migration: move insights to top (after live-news)
       if (currentVariant === 'tech') {
-        const TECH_INSIGHTS_MIGRATION_KEY = 'worldmonitor-tech-insights-top-v1';
+        const TECH_INSIGHTS_MIGRATION_KEY = 'world-tech-insights-top-v1';
         if (!localStorage.getItem(TECH_INSIGHTS_MIGRATION_KEY)) {
           const savedOrder = localStorage.getItem(this.PANEL_ORDER_KEY);
           if (savedOrder) {
@@ -2508,7 +2508,7 @@ export class App {
     // enable/disable set — then reloads so the grid rebuilds from the pristine
     // DEFAULT_PANELS. One reset, one way.
     localStorage.removeItem(this.PANEL_ORDER_KEY);
-    localStorage.removeItem('worldmonitor-panel-spans');
+    localStorage.removeItem('world-panel-spans');
     localStorage.removeItem(this.MAP_COLS_KEY);
     localStorage.removeItem('hanzo-world-custom-panels');
     saveToStorage(STORAGE_KEYS.panels, { ...DEFAULT_PANELS });
@@ -2764,11 +2764,11 @@ export class App {
       const setMode = (on: boolean): void => {
         header?.classList.toggle('hanzo-mode', on);
         hanzoToggle.setAttribute('aria-expanded', String(on));
-        try { localStorage.setItem('worldmonitor-hanzo-mode', on ? '1' : '0'); } catch { /* non-fatal */ }
+        try { localStorage.setItem('world-hanzo-mode', on ? '1' : '0'); } catch { /* non-fatal */ }
       };
       // Restore: reopen if previously opened; also open when the current view is NOT
       // the Hanzo default, so a deep-linked visitor can still reach the switcher.
-      const stored = (() => { try { return localStorage.getItem('worldmonitor-hanzo-mode'); } catch { return null; } })();
+      const stored = (() => { try { return localStorage.getItem('world-hanzo-mode'); } catch { return null; } })();
       setMode(stored === '1' || (stored === null && getSiteVariant() !== 'cloud'));
       hanzoToggle.addEventListener('click', (e) => {
         e.preventDefault();
@@ -2991,7 +2991,7 @@ export class App {
     }
   }
 
-  private readonly MAP_COLS_KEY = 'worldmonitor-panel-cols';
+  private readonly MAP_COLS_KEY = 'world-panel-cols';
 
   private setupMapPanel(): void {
     const mapSection = document.getElementById('mapSection');

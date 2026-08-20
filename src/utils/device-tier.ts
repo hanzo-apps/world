@@ -9,11 +9,11 @@
 //
 // Signals: navigator.hardwareConcurrency (logical cores) + navigator.deviceMemory
 // (GB, Chromium-only) + prefers-reduced-motion. Override with ?tier=low|mid|high
-// or localStorage('worldmonitor-device-tier') for testing on capable hardware.
+// or localStorage('world-device-tier') for testing on capable hardware.
 
 export type DeviceTier = 'low' | 'mid' | 'high';
 
-const OVERRIDE_KEY = 'worldmonitor-device-tier';
+const OVERRIDE_KEY = 'world-device-tier';
 
 function readOverride(): DeviceTier | null {
   if (typeof window === 'undefined') return null;

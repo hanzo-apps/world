@@ -1,5 +1,5 @@
 name: Bug Report
-description: Report a bug in World Monitor
+description: Report a bug in Hanzo World
 labels: ["bug"]
 body:
   - type: markdown

@@ -88,7 +88,7 @@ func TestDashboardRoundTripAndIdentityIsolation(t *testing.T) {
 	}
 
 	// PUT the composed dashboard (opaque mirror of the localStorage keys).
-	cfg := `{"panel-order":"[\"live-news\",\"markets\"]","worldmonitor-panels":"{\"markets\":{\"enabled\":true}}","hanzo-world-map-mode":"3d"}`
+	cfg := `{"panel-order":"[\"live-news\",\"markets\"]","world-panels":"{\"markets\":{\"enabled\":true}}","hanzo-world-map-mode":"3d"}`
 	w := callDashboard(s, "PUT", alice, cfg)
 	if w.Code != 200 {
 		t.Fatalf("PUT status = %d (body=%s)", w.Code, w.Body.String())
@@ -103,7 +103,7 @@ func TestDashboardRoundTripAndIdentityIsolation(t *testing.T) {
 	// GET returns EXACTLY what was stored, verbatim.
 	want := map[string]string{
 		"panel-order":          `["live-news","markets"]`,
-		"worldmonitor-panels":  `{"markets":{"enabled":true}}`,
+		"world-panels":  `{"markets":{"enabled":true}}`,
 		"hanzo-world-map-mode": "3d",
 	}
 	if got := dashboardConfig(t, callDashboard(s, "GET", alice, "")); !reflect.DeepEqual(got, want) {

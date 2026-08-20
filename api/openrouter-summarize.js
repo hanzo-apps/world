@@ -220,7 +220,7 @@ Rules:
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://world.hanzo.ai',
-        'X-Title': 'WorldMonitor',
+        'X-Title': 'HanzoWorld',
       },
       body: JSON.stringify({
         model: MODEL,
