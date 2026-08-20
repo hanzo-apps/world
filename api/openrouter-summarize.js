@@ -219,7 +219,7 @@ Rules:
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://worldmonitor.app',
+        'HTTP-Referer': 'https://world.hanzo.ai',
         'X-Title': 'WorldMonitor',
       },
       body: JSON.stringify({

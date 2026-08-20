@@ -13,9 +13,9 @@ body:
       label: Variant
       description: Which variant are you using?
       options:
-        - worldmonitor.app (Full / Geopolitical)
-        - tech.worldmonitor.app (Tech / Startup)
-        - finance.worldmonitor.app (Finance)
+        - world.hanzo.ai (Full / Geopolitical)
+        - world.hanzo.ai (Tech / Startup)
+        - world.hanzo.ai (Finance)
         - Desktop app (Windows)
         - Desktop app (macOS)
     validations:

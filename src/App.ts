@@ -778,11 +778,11 @@ export class App {
   }
 
   private async checkForUpdate(): Promise<void> {
-    // Hanzo: upstream worldmonitor.app update/download check removed.
+    // Hanzo: upstream world.hanzo.ai update/download check removed.
     return;
   }
 
-  // Hanzo: upstream worldmonitor.app update-badge + desktop-download machinery removed.
+  // Hanzo: upstream world.hanzo.ai update-badge + desktop-download machinery removed.
 
   private startHeaderClock(): void {
     const el = document.getElementById('headerClock');
