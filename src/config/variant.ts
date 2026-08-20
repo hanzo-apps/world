@@ -24,7 +24,7 @@ export function isLuxFundHost(): boolean {
 
 // isHanzoBrandHost reports whether the Hanzo brand surface (the H-logo toggle + the
 // Cloud switcher entry) may appear. White-label rule: ONLY hanzo.ai / hanzo.app
-// hosts — never Lux/Zoo/upstream worldmonitor.app deployments. Local dev counts so
+// hosts — never Lux/Zoo/upstream world.hanzo.ai deployments. Local dev counts so
 // the flagship is what you see with `npm run dev`.
 export function isHanzoBrandHost(): boolean {
   if (typeof window === 'undefined') return false;

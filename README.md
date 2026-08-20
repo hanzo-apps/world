@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://world.hanzo.ai"><img src="https://img.shields.io/badge/Web_App-world.hanzo.ai-blue?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Web App"></a>&nbsp;
-  <a href="https://tech.worldmonitor.app"><img src="https://img.shields.io/badge/Tech_Variant-tech.worldmonitor.app-0891b2?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Tech Variant"></a>&nbsp;
+  <a href="https://world.hanzo.ai"><img src="https://img.shields.io/badge/Tech_Variant-world.hanzo.ai-0891b2?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Tech Variant"></a>&nbsp;
 </p>
 
 <p align="center">
@@ -189,7 +189,7 @@ All three variants run from a single codebase — switch between them with one c
 - **Native desktop app** for macOS and Windows — packages the full dashboard with a local Node.js sidecar that runs all 60+ API handlers locally
 - **OS keychain integration** — API keys stored in the system credential manager (macOS Keychain, Windows Credential Manager), never in plaintext files
 - **Token-authenticated sidecar** — a unique session token prevents other local processes from accessing the sidecar on localhost. Generated per launch using randomized hashing
-- **Cloud fallback** — when a local API handler fails or is missing, requests transparently fall through to the cloud deployment (worldmonitor.app) with origin headers stripped
+- **Cloud fallback** — when a local API handler fails or is missing, requests transparently fall through to the cloud deployment (world.hanzo.ai) with origin headers stripped
 - **Settings window** — dedicated configuration UI (Cmd+,) for managing 17 API keys with validation, signup links, and feature-availability indicators
 - **Verbose debug mode** — toggle traffic logging with persistent state across restarts. View the last 200 requests with timing, status codes, and error details
 - **DevTools toggle** — Cmd+Alt+I opens the embedded web inspector for debugging
@@ -649,7 +649,7 @@ A single codebase produces three specialized dashboards, each with distinct feed
 
 | Aspect | World Monitor | Tech Monitor | Finance Monitor |
 |--------|--------------|--------------|-----------------|
-| **Domain** | worldmonitor.app | tech.worldmonitor.app | finance.worldmonitor.app |
+| **Domain** | world.hanzo.ai | world.hanzo.ai | world.hanzo.ai |
 | **Focus** | Geopolitics, military, conflicts | AI/ML, startups, cybersecurity | Markets, trading, central banks |
 | **RSS Feeds** | ~25 categories (politics, MENA, Africa, think tanks) | ~20 categories (AI, VC blogs, startups, GitHub) | ~18 categories (forex, bonds, commodities, IPOs) |
 | **Panels** | 44 (strategic posture, CII, cascade) | 31 (AI labs, unicorns, accelerators) | 30 (forex, bonds, derivatives, institutional) |
@@ -778,7 +778,7 @@ The Tauri desktop app wraps the dashboard in a native window with a local Node.j
                       │ fetch (on local failure)
                       ▼
 ┌─────────────────────────────────────────────────┐
-│         Cloud (worldmonitor.app)                 │
+│         Cloud (world.hanzo.ai)                 │
 │  Transparent fallback when local handlers fail   │
 └─────────────────────────────────────────────────┘
 ```
@@ -876,7 +876,7 @@ The AI summarization pipeline adds content-based deduplication: headlines are ha
 
 | Layer | Mechanism |
 |-------|-----------|
-| **CORS origin allowlist** | Only `worldmonitor.app`, `tech.worldmonitor.app`, `finance.worldmonitor.app`, and `localhost:*` can call API endpoints. All others receive 403. Implemented in `api/_cors.js`. |
+| **CORS origin allowlist** | Only `world.hanzo.ai`, `world.hanzo.ai`, `world.hanzo.ai`, and `localhost:*` can call API endpoints. All others receive 403. Implemented in `api/_cors.js`. |
 | **RSS domain allowlist** | The RSS proxy only fetches from explicitly listed domains (~90+). Requests for unlisted domains are rejected with 403. |
 | **Railway domain allowlist** | The Railway relay has a separate, smaller domain allowlist for feeds that need the alternate origin. |
 | **API key isolation** | All API keys live server-side in Vercel environment variables. The browser never sees Groq, OpenRouter, ACLED, Finnhub, or other credentials. |
@@ -893,8 +893,8 @@ The AI summarization pipeline adds content-based deduplication: headlines are ha
 
 ```bash
 # Clone and run
-git clone https://github.com/koala73/worldmonitor.git
-cd worldmonitor
+git clone https://github.com/hanzoai/world.git
+cd world
 npm install
 vercel dev       # Runs frontend + all 60+ API edge functions
 ```
@@ -1013,9 +1013,9 @@ Contributions welcome! See [CONTRIBUTING](./docs/DOCUMENTATION.md#contributing) 
 
 ```bash
 # Development
-npm run dev          # Full variant (worldmonitor.app)
-npm run dev:tech     # Tech variant (tech.worldmonitor.app)
-npm run dev:finance  # Finance variant (finance.worldmonitor.app)
+npm run dev          # Full variant (world.hanzo.ai)
+npm run dev:tech     # Tech variant (world.hanzo.ai)
+npm run dev:finance  # Finance variant (world.hanzo.ai)
 
 # Production builds
 npm run build:full      # Build full variant
@@ -1109,15 +1109,15 @@ MIT License — see [LICENSE](LICENSE) for details.
 ---
 
 <p align="center">
-  <a href="https://worldmonitor.app">worldmonitor.app</a> &nbsp;·&nbsp;
-  <a href="https://tech.worldmonitor.app">tech.worldmonitor.app</a> &nbsp;·&nbsp;
+  <a href="https://world.hanzo.ai">world.hanzo.ai</a> &nbsp;·&nbsp;
+  <a href="https://world.hanzo.ai">world.hanzo.ai</a> &nbsp;·&nbsp;
 </p>
 
 ## Star History
 
-<a href="https://api.star-history.com/svg?repos=koala73/worldmonitor&type=Date">
+<a href="https://api.star-history.com/svg?repos=hanzoai/world&type=Date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=koala73/worldmonitor&type=Date&type=Date&theme=dark" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=koala73/worldmonitor&type=Date&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=hanzoai/world&type=Date&type=Date&theme=dark" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=hanzoai/world&type=Date&type=Date" />
  </picture>
 </a>

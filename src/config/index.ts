@@ -1,8 +1,8 @@
 // Configuration exports
 // For variant-specific builds, set VITE_VARIANT environment variable
-// VITE_VARIANT=tech → tech.worldmonitor.app (tech-focused)
-// VITE_VARIANT=full → worldmonitor.app (geopolitical)
-// VITE_VARIANT=finance → finance.worldmonitor.app (markets/trading)
+// VITE_VARIANT=tech → world.hanzo.ai (tech-focused)
+// VITE_VARIANT=full → world.hanzo.ai (geopolitical)
+// VITE_VARIANT=finance → world.hanzo.ai (markets/trading)
 
 export { SITE_VARIANT, getSiteVariant, setSiteVariantRuntime, isHanzoBrandHost, isLuxFundHost } from './variant';
 

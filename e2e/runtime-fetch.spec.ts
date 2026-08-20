@@ -53,8 +53,8 @@ test.describe('desktop runtime routing guardrails', () => {
           hasTauriGlobals: false,
           userAgent: 'Mozilla/5.0',
           locationProtocol: 'https:',
-          locationHost: 'worldmonitor.app',
-          locationOrigin: 'https://worldmonitor.app',
+          locationHost: 'world.hanzo.ai',
+          locationOrigin: 'https://world.hanzo.ai',
         }),
       };
     });
@@ -230,7 +230,7 @@ test.describe('desktop runtime routing guardrails', () => {
     expect(result.storedValue).toBe('1');
   });
 
-  // The upstream worldmonitor.app update-badge + arch-aware desktop-download
+  // The upstream world.hanzo.ai update-badge + arch-aware desktop-download
   // machinery (App.resolveUpdateDownloadUrl / mapDesktopDownloadPlatform, driven by
   // the get_desktop_runtime_info Tauri command) was removed for Hanzo —
   // App.checkForUpdate is now a deliberate no-op and downloads are served from
