@@ -50,12 +50,12 @@ func TestHistoryRoundTripIsolationAndGates(t *testing.T) {
 	}
 
 	// PUT real usage (recent searches + watch queue), verbatim opaque strings.
-	blob := `{"worldmonitor_recent_searches":"[\"nvidia\",\"opec\"]","hanzo-world-watch-queue":"{\"items\":[]}"}`
+	blob := `{"world_recent_searches":"[\"nvidia\",\"opec\"]","hanzo-world-watch-queue":"{\"items\":[]}"}`
 	if w := callHistory(s, "PUT", alice, blob); w.Code != 200 {
 		t.Fatalf("PUT status = %d (body=%s)", w.Code, w.Body.String())
 	}
 	want := map[string]string{
-		"worldmonitor_recent_searches": `["nvidia","opec"]`,
+		"world_recent_searches": `["nvidia","opec"]`,
 		"hanzo-world-watch-queue":      `{"items":[]}`,
 	}
 	if got := blobConfig(t, callHistory(s, "GET", alice, "")); !reflect.DeepEqual(got, want) {

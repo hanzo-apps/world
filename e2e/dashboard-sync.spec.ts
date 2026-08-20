@@ -65,9 +65,9 @@ test.describe('dashboard sync (real app)', () => {
     await page.waitForTimeout(2000); // let the boot writes flush their debounced PUT first
     // Change an observed dashboard key; a debounced PUT carries a snapshot of ALL
     // dashboard keys, including our change.
-    await page.evaluate(() => localStorage.setItem('worldmonitor-layers', '{"quakes":true}'));
+    await page.evaluate(() => localStorage.setItem('world-layers', '{"quakes":true}'));
     await expect
-      .poll(() => puts.some((p) => p && p['worldmonitor-layers'] === '{"quakes":true}'), { timeout: 8000 })
+      .poll(() => puts.some((p) => p && p['world-layers'] === '{"quakes":true}'), { timeout: 8000 })
       .toBe(true);
   });
 
@@ -79,7 +79,7 @@ test.describe('dashboard sync (real app)', () => {
     });
     await page.goto('/'); // no fakeAuth → anonymous
     await page.waitForSelector(LN, { timeout: 45000 });
-    await page.evaluate(() => localStorage.setItem('worldmonitor-layers', '{"a":1}'));
+    await page.evaluate(() => localStorage.setItem('world-layers', '{"a":1}'));
     await page.waitForTimeout(1200);
     expect(hit).toBe(false);
   });
@@ -107,12 +107,12 @@ test.describe('dashboard sync (real app)', () => {
     await page.waitForTimeout(2000); // flush boot writes first
 
     // A real user action (a recent search) is a HISTORY key → PUT to /history.
-    await page.evaluate(() => localStorage.setItem('worldmonitor_recent_searches', '["nvidia"]'));
+    await page.evaluate(() => localStorage.setItem('world_recent_searches', '["nvidia"]'));
     await expect
-      .poll(() => histPuts.some((p) => p && p['worldmonitor_recent_searches'] === '["nvidia"]'), { timeout: 8000 })
+      .poll(() => histPuts.some((p) => p && p['world_recent_searches'] === '["nvidia"]'), { timeout: 8000 })
       .toBe(true);
     // …and it was NOT mixed into a dashboard PUT (clean namespace separation).
-    expect(dashPuts.some((b) => b.includes('worldmonitor_recent_searches'))).toBe(false);
+    expect(dashPuts.some((b) => b.includes('world_recent_searches'))).toBe(false);
   });
 
   // Org-shared default precedence: the org default is hydrated as the BASE, then the

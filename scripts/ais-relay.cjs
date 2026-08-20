@@ -660,7 +660,7 @@ async function handleOpenSkyRequest(req, res, PORT) {
     const request = https.get(openskyUrl, {
       headers: {
         'Accept': 'application/json',
-        'User-Agent': 'WorldMonitor/1.0',
+        'User-Agent': 'HanzoWorld/1.0',
         'Authorization': `Bearer ${token}`,
       },
       timeout: 15000
@@ -812,7 +812,7 @@ function handleWorldBankRequest(req, res) {
   const request = https.get(wbUrl, {
     headers: {
       'Accept': 'application/json',
-      'User-Agent': 'Mozilla/5.0 (compatible; WorldMonitor/1.0; +https://world.hanzo.ai)',
+      'User-Agent': 'Mozilla/5.0 (compatible; HanzoWorld/1.0; +https://world.hanzo.ai)',
     },
     timeout: 15000,
   }, (response) => {

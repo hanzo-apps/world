@@ -5,7 +5,7 @@
 // folds those raw observations into one canonical cyclone per storm while
 // preserving each agency's own wind reading verbatim. No IO here: the live
 // inputs (GDACS rows, HKO warning summary) are fetched by eonet.ts and handed
-// in. Ported from worldmonitor scripts/natural/western-pacific-cyclones.mjs.
+// in. Ported from world scripts/natural/western-pacific-cyclones.mjs.
 import type { GDACSEvent } from './gdacs';
 import type { CycloneAgencyObservation, NaturalEvent } from '@/types';
 

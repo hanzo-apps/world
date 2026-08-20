@@ -26,7 +26,7 @@ export interface PanelTab {
   count?: number;
 }
 
-const PANEL_SPANS_KEY = 'worldmonitor-panel-spans';
+const PANEL_SPANS_KEY = 'world-panel-spans';
 
 // Row-span (height) persistence + class mapping. Exported so non-Panel grid
 // citizens (the map) can reuse the exact same height mechanism — one way to size

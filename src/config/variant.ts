@@ -49,10 +49,10 @@ export const SITE_VARIANT: string = (() => {
     // back to the stored choice, then the host default, then the build-time default.
     const fromUrl = normVariant(new URLSearchParams(window.location.search).get('variant'));
     if (fromUrl) {
-      localStorage.setItem('worldmonitor-variant', fromUrl);
+      localStorage.setItem('world-variant', fromUrl);
       return fromUrl;
     }
-    const stored = normVariant(localStorage.getItem('worldmonitor-variant'));
+    const stored = normVariant(localStorage.getItem('world-variant'));
     if (stored) return stored;
     // lux.fund leads with the `fund` macro terminal (rotation + the Lux book on the
     // globe) — same guard as the Cloud default: only when the build didn't pin a
@@ -88,7 +88,7 @@ export function setSiteVariantRuntime(v: string): string | null {
   if (!nv) return null;
   currentVariant = nv;
   try {
-    localStorage.setItem('worldmonitor-variant', nv);
+    localStorage.setItem('world-variant', nv);
   } catch {
     /* private mode — the URL still carries the choice */
   }

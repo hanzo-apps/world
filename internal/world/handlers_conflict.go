@@ -312,7 +312,7 @@ func (s *Server) handleHAPI(w http.ResponseWriter, r *http.Request) {
 	}
 	s.cachedJSON(w, "hapi:conflict-events:v2", "public, max-age=1800", 6*time.Hour, 6*time.Hour,
 		func(ctx context.Context) (any, error) {
-			appID := base64Std("worldmonitor:monitor@world.hanzo.ai")
+			appID := base64Std("world:monitor@world.hanzo.ai")
 			var raw struct {
 				Data []map[string]any `json:"data"`
 			}

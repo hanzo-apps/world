@@ -1,13 +1,13 @@
 export const config = { runtime: 'edge' };
 
-const RELEASES_URL = 'https://api.github.com/repos/koala73/worldmonitor/releases/latest';
+const RELEASES_URL = 'https://api.github.com/repos/koala73/world/releases/latest';
 
 export default async function handler() {
   try {
     const res = await fetch(RELEASES_URL, {
       headers: {
         'Accept': 'application/vnd.github+json',
-        'User-Agent': 'WorldMonitor-Version-Check',
+        'User-Agent': 'HanzoWorld-Version-Check',
       },
     });
 

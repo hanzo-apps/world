@@ -24,7 +24,7 @@ test.describe('keyword spike modal/badge flow', () => {
       // The findings badge is opt-in (default OFF): its constructor only mounts and
       // renders when the user has enabled it. Simulate an opted-in session so the
       // badge mounts into .header-right and its count/dropdown render.
-      localStorage.setItem('worldmonitor-intel-findings', 'shown');
+      localStorage.setItem('world-intel-findings', 'shown');
 
       const modal = new SignalModal();
       const badge = new IntelligenceGapBadge();
@@ -117,7 +117,7 @@ test.describe('keyword spike modal/badge flow', () => {
       if (store?.previousConfig) {
         trending.updateTrendingConfig(store.previousConfig);
       }
-      localStorage.removeItem('worldmonitor-intel-findings');
+      localStorage.removeItem('world-intel-findings');
       delete (window as unknown as Record<string, unknown>).__keywordSpikeTest;
     });
   });

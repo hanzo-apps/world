@@ -1,6 +1,6 @@
 // Pure state derivation for the China summary groups. Kept free of service/DOM
 // imports so the four-state contract (available/partial/stale/unavailable) stays
-// unit-testable. Ported verbatim from worldmonitor src/app/china-summary-state.ts;
+// unit-testable. Ported verbatim from world src/app/china-summary-state.ts;
 // the signal/group types are defined locally because this fork surfaces China in
 // the Economic Indicators panel rather than the upstream CountryBriefPanel.
 

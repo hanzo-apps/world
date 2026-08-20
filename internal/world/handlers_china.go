@@ -16,8 +16,8 @@ import (
 )
 
 // China macro snapshot + official release calendar. A faithful Go port of the
-// worldmonitor seed adapters (scripts/china-macro/{adapters,calendar}.mjs) and
-// the merge in server/worldmonitor/economic/v1/get-china-macro-snapshot.ts.
+// world seed adapters (scripts/china-macro/{adapters,calendar}.mjs) and
+// the merge in server/world/economic/v1/get-china-macro-snapshot.ts.
 //
 // Every source parser is a small pure func over a raw body so it is unit-tested
 // against the same fixtures as the TypeScript original. handleChinaMacro is the
@@ -764,7 +764,7 @@ func (s *Server) chinaMerge(ctx context.Context, now time.Time, checkedAt string
 		parseOecdCsvIndicator(cliCSV, indicatorDef{id: "activity_cli", label: "Composite Leading Indicator", category: "activity", unit: "index", source: "OECD Data Explorer", sourceURL: oecdCLIURL, maxAgeDays: 120}, now),
 	}
 
-	// 2. BIS policy rate — read from the seed cache key the worldmonitor BIS job
+	// 2. BIS policy rate — read from the seed cache key the world BIS job
 	// populates. Our fork ships no such job, so the key is empty and the indicator
 	// is honestly not_configured; parseBisPolicy lights up the moment it is seeded.
 	if b, ok := s.kvGet(ctx, bisPolicyCacheKey); ok {

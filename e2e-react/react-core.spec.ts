@@ -86,7 +86,7 @@ test.describe('React entry — shared panel-order', () => {
     // first — the cross-surface persistence contract.
     await page.addInitScript(() => {
       // World variant so the seeded ids are all in the visible set.
-      window.localStorage.setItem('worldmonitor-variant', 'full');
+      window.localStorage.setItem('world-variant', 'full');
       window.localStorage.setItem(
         'panel-order',
         JSON.stringify(['strategic-risk', 'markets', 'cii', 'economic']),
@@ -103,7 +103,7 @@ test.describe('React entry — shared panel-order', () => {
 test.describe('React entry — drag reorder', () => {
   test('a pointer drag reorders the grid and writes the shared key', async ({ page }) => {
     await page.addInitScript(() => {
-      window.localStorage.setItem('worldmonitor-variant', 'full');
+      window.localStorage.setItem('world-variant', 'full');
       window.localStorage.removeItem('panel-order');
     });
     await page.goto(REACT);
@@ -175,7 +175,7 @@ test.describe('React entry — a panel live fetch renders', () => {
     await page.route('**/v1/world/yahoo-batch**', (route) => route.fulfill({ json: {} }));
     await page.route('**/v1/world/yahoo-finance**', (route) => route.fulfill({ json: {} }));
 
-    await page.addInitScript(() => window.localStorage.setItem('worldmonitor-variant', 'full'));
+    await page.addInitScript(() => window.localStorage.setItem('world-variant', 'full'));
     await page.goto(REACT);
     await waitForRail(page);
 

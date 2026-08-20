@@ -45,7 +45,7 @@ interface LayoutState {
 // Read live (getSiteVariant) so an in-place variant switch persists under the key
 // of the variant currently on screen.
 function layoutKey(): string {
-  return `worldmonitor-layout:${getSiteVariant()}`;
+  return `world-layout:${getSiteVariant()}`;
 }
 
 // px — the grid column-track floor, exposed to CSS as `--panel-col-min` (the

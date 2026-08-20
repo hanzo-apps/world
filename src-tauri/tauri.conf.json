@@ -1,9 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Hanzo World",
-  "mainBinaryName": "world-monitor",
+  "mainBinaryName": "world",
   "version": "2.3.9",
-  "identifier": "app.worldmonitor.desktop",
+  "identifier": "app.world.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",

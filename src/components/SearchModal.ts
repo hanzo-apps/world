@@ -17,7 +17,7 @@ interface SearchableSource {
   items: { id: string; title: string; subtitle?: string; data: unknown }[];
 }
 
-const RECENT_SEARCHES_KEY = 'worldmonitor_recent_searches';
+const RECENT_SEARCHES_KEY = 'world_recent_searches';
 const MAX_RECENT = 8;
 const MAX_RESULTS = 24;
 

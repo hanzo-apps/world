@@ -1,6 +1,6 @@
 # Hanzo World — agent guide
 
-Vite + TypeScript SPA (`world-monitor`). Real-time global-intelligence dashboard
+Vite + TypeScript SPA (`world`). Real-time global-intelligence dashboard
 served at `world.hanzo.ai`, shipped by `hanzo.yml` CI/CD onto the `world`
 operator Service CR. Same-origin data plane under `/v1/world/*`.
 
