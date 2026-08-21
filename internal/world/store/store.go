@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"time"
 
-	_ "github.com/hanzoai/sqlite"
+	"github.com/hanzoai/sqlite"
 )
 
 // DB owns the embedded SQLite handle and the two logical stores layered on it.
@@ -98,9 +98,10 @@ func Open(dir string, retention time.Duration) (*DB, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return degraded, err
 	}
-	dsn := "file:" + filepath.Join(dir, dbFile) +
-		"?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)"
-	sqldb, err := sql.Open("sqlite", dsn)
+	// The driver builds the DSN: the two backends spell a pragma differently in
+	// one and each ignores the other's spelling silently, so a hand-written
+	// profile applies on one build and evaporates on the other.
+	sqldb, err := sql.Open("sqlite", dsn(filepath.Join(dir, dbFile)))
 	if err != nil {
 		return degraded, err
 	}
@@ -137,3 +138,13 @@ func (d *DB) Close() error {
 
 // logStore namespaces the store's best-effort warnings.
 func logStore(format string, args ...any) { log.Printf("world-store: "+format, args...) }
+
+// dsn addresses path with this store's durability profile.
+func dsn(path string) string {
+	return sqlite.PragmaDSN(path, []sqlite.Pragma{
+		{Name: "journal_mode", Value: "WAL"},
+		{Name: "busy_timeout", Value: "5000"},
+		{Name: "synchronous", Value: "NORMAL"},
+		{Name: "foreign_keys", Value: "ON"},
+	})
+}
