@@ -1,5 +1,5 @@
 /* ── "Try Hanzo" product switcher — header dropdown (hanzo.ai "Try" menu) ──────
-   Monochrome, Geist, sentence case. The trigger reuses the shared .hz-cta white
+   Monochrome, Zen, sentence case. The trigger reuses the shared .hz-cta white
    pill (+ a caret); the menu opens below the pill, closes on click-away / Escape,
    and is absolutely positioned so it can never widen the header or the page.
    Kept in its own stylesheet so it never touches main.css. */

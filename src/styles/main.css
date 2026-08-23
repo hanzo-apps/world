@@ -60,9 +60,9 @@
   --map-country: #0a2018;
   --map-stroke: #0f5040;
 
-  /* Font stack — Hanzo: Geist Sans (UI) + Geist Mono (data/numeric) */
-  --font-body: 'Geist', system-ui, -apple-system, sans-serif;
-  --font-mono: 'Geist Mono', 'SF Mono', 'Monaco', monospace;
+  /* Font stack — Hanzo: Zen (UI) + Zen Mono (data/numeric) */
+  --font-body: 'Zen', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Zen Mono', 'SF Mono', 'Monaco', monospace;
 
   /* Radius scale — @hanzo/gui token (soft, Vercel-like) */
   --radius: 8px;        /* panels, modals, cards */
@@ -101,16 +101,16 @@
   --world-transition: 150ms ease;
 }
 
-/* Self-hosted Geist (no CDN — CSP-safe), from @hanzo/gui / Hanzo brand pack */
+/* Self-hosted Zen (no CDN — CSP-safe), from @hanzo/gui / Hanzo brand pack */
 @font-face {
-  font-family: 'Geist';
-  src: url('/fonts/GeistVF.woff2') format('woff2');
+  font-family: 'Zen';
+  src: url('/fonts/ZenVF.woff2') format('woff2');
   font-weight: 100 900;
   font-display: swap;
 }
 @font-face {
-  font-family: 'Geist Mono';
-  src: url('/fonts/GeistMonoVF.woff2') format('woff2');
+  font-family: 'Zen Mono';
+  src: url('/fonts/ZenMonoVF.woff2') format('woff2');
   font-weight: 100 900;
   font-display: swap;
 }
@@ -1323,8 +1323,8 @@ body.panel-drag-active .map-container {
 }
 
 /* ============================================================
-   Numeric / data → Geist Mono (one way for every value cell)
-   Labels, headers and body stay Geist Sans. Tabular figures so
+   Numeric / data → Zen Mono (one way for every value cell)
+   Labels, headers and body stay Zen. Tabular figures so
    columns of numbers align — matches @hanzo/ui/world numerics.
    ============================================================ */
 .value,
@@ -15808,7 +15808,7 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 
 /* ============================================================================
    SaaS / Cloud variant panels (?variant=saas)
-   Dense stat tiles, Geist Mono numerics, black monochrome. Uses the shared
+   Dense stat tiles, Zen Mono numerics, black monochrome. Uses the shared
    theme tokens so it renders correctly in both dark and light.
    ========================================================================== */
 .cloud-panel .panel-content { padding: 10px 12px; }
@@ -16028,7 +16028,7 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 .fw-panel { gap: 10px; }
 .fw-hero { text-align: center; padding: 4px 0 2px; }
 .fw-hero-value {
-  font-family: var(--font-mono, 'Geist Mono', ui-monospace, monospace);
+  font-family: var(--font-mono, 'Zen Mono', ui-monospace, monospace);
   font-weight: 600; font-size: 34px; line-height: 1.05; letter-spacing: -0.02em;
   color: var(--text); font-variant-numeric: tabular-nums;
 }

@@ -5,7 +5,7 @@
  * collides with, nor depends on, main.css. Imported by AnalystChat.ts, so it
  * ships wherever the chat is mounted (dock, in-grid panel, country brief).
  *
- * Design canon: vercel-black monochrome, Geist, sentence case, the real Zen
+ * Design canon: vercel-black monochrome, Zen, sentence case, the real Zen
  * mark as the only glyph brand. Tokens (--bg / --border / --text / --font-*)
  * come from main.css :root, so light/dark themes follow automatically.
  */
