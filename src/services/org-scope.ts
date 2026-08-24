@@ -4,9 +4,9 @@
 // localStorage `hanzo_iam_org`, stamped as `X-Org-Id`). This module layers the
 // per-org PROJECT selection on top and composes the scoped headers world sends to
 // api.hanzo.ai — `X-Org-Id` + `X-Project-Id`, exactly what the cloud gateway
-// reads (hanzo/cloud/middleware_identity.go). Org/project LISTS come from IAM
-// (get-organizations / get-organization-projects); the gateway re-pins a normal
-// bearer to its own owner, so switching is safe — only a global admin crosses orgs.
+// reads (hanzo/cloud/middleware_identity.go). Org/project LISTS come from IAM's
+// organization and project collections; the gateway re-pins a normal bearer to
+// its own owner, so switching is safe — only a global admin crosses orgs.
 
 import {
   getToken,
@@ -19,6 +19,11 @@ import {
 } from './iam';
 
 const PROJECT_KEY = 'hanzo_iam_project'; // active project, per-org: `${org}:${project}`
+
+// IAM's project collection. The listing is owner-scoped by IAM itself: `owner`
+// names which org to read and IAM refuses one the caller does not belong to, so
+// an omitted owner reads the caller's own.
+const IAM_PROJECTS = '/v1/iam/projects';
 
 export interface Project {
   id: string;   // canonical project id (IAM project name)
@@ -64,21 +69,25 @@ export function apiBase(): string {
 }
 
 /**
- * Projects for an org from IAM (get-organization-projects). Degrades to a single
- * Default project when the endpoint is unreachable/empty, so the switcher is
- * always usable.
+ * Projects for an org from IAM's project collection. Degrades to a single Default
+ * project when the endpoint is unreachable/empty, so the switcher is always
+ * usable — and says so, because a lone "Default" is what a real one-project org
+ * looks like too.
  */
 export async function listProjects(org: string): Promise<Project[]> {
   if (!org) return [DEFAULT_PROJECT];
   try {
     const tok = await getToken();
     if (!tok) return [DEFAULT_PROJECT];
-    const u = new URL(`${iamIssuer}/v1/iam/get-organization-projects`);
-    u.searchParams.set('organization', org);
+    const u = new URL(`${iamIssuer}${IAM_PROJECTS}`);
+    u.searchParams.set('owner', org);
     const r = await fetch(u.toString(), { headers: { Authorization: `Bearer ${tok}` } });
-    if (!r.ok) return [DEFAULT_PROJECT];
+    if (!r.ok) {
+      console.warn(`[org-scope] ${IAM_PROJECTS} answered ${r.status} for ${org}; showing Default only`);
+      return [DEFAULT_PROJECT];
+    }
     const data = await r.json();
-    const arr: unknown[] = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+    const arr: unknown[] = Array.isArray(data?.projects) ? data.projects : [];
     const list: Project[] = arr
       .map((p) => {
         const rec = p as { name?: unknown; displayName?: unknown };
@@ -87,7 +96,8 @@ export async function listProjects(org: string): Promise<Project[]> {
       })
       .filter((p) => p.id);
     return list.length ? list : [DEFAULT_PROJECT];
-  } catch {
+  } catch (err) {
+    console.warn(`[org-scope] ${IAM_PROJECTS} unreachable for ${org}; showing Default only:`, err);
     return [DEFAULT_PROJECT];
   }
 }

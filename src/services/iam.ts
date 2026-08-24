@@ -64,11 +64,12 @@ const K = {
   org: 'hanzo_iam_org',     // active tenant org (blank/absent => home org)
 } as const;
 
-// IAM API — verb paths, served from the same issuer as OIDC. Used to
-// list the orgs a user belongs to (self-scoped for a normal token; all orgs for
-// a global admin). Projects live under org-scope, one call away.
+// IAM API — the organization collection, served from the same issuer as OIDC.
+// Used to list the orgs a user belongs to. The scope rides on the bearer rather
+// than the request: a normal token reads its own orgs, a platform operator reads
+// every one. Projects live under org-scope, one call away.
 const IAM_API = {
-  organizations: '/v1/iam/get-organizations',
+  organizations: '/v1/iam/organizations',
 } as const;
 
 // Orgs that may see the platform-wide Cloud console: the base {admin, built-in}
@@ -345,9 +346,11 @@ export function isOrgScopedAway(): boolean {
 }
 
 /**
- * The orgs the signed-in user belongs to, from IAM get-organizations. A normal
- * token is server-side scoped to its own org; a global admin sees all. Degrades
- * to the single home org on any failure so the switcher is always usable.
+ * The orgs the signed-in user belongs to, from the IAM organization collection.
+ * A normal token is server-side scoped to its own org; a global admin sees all.
+ * Degrades to the single home org on any failure so the switcher is always
+ * usable — and says so, because a switcher silently showing one org looks exactly
+ * like a person who belongs to one org.
  */
 export async function listOrgs(force = false): Promise<OrgInfo[]> {
   if (cachedOrgs && !force) return cachedOrgs;
@@ -356,12 +359,15 @@ export async function listOrgs(force = false): Promise<OrgInfo[]> {
   const tok = await getToken();
   if (!tok) return fallback;
   try {
-    const u = new URL(ISSUER + IAM_API.organizations);
-    if (home) u.searchParams.set('owner', home);
-    const r = await fetch(u.toString(), { headers: { Authorization: `Bearer ${tok}` } });
-    if (!r.ok) return fallback;
+    const r = await fetch(ISSUER + IAM_API.organizations, {
+      headers: { Authorization: `Bearer ${tok}` },
+    });
+    if (!r.ok) {
+      console.warn(`[iam] ${IAM_API.organizations} answered ${r.status}; showing the home org only`);
+      return fallback;
+    }
     const data = await r.json();
-    const arr: unknown[] = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+    const arr: unknown[] = Array.isArray(data?.organizations) ? data.organizations : [];
     const orgs = arr
       .map((o) => {
         const rec = o as { name?: unknown; displayName?: unknown; logo?: unknown };
@@ -375,7 +381,8 @@ export async function listOrgs(force = false): Promise<OrgInfo[]> {
     const seen = new Set<string>();
     cachedOrgs = merged.filter((o) => (seen.has(o.name) ? false : (seen.add(o.name), true)));
     return cachedOrgs.length ? cachedOrgs : fallback;
-  } catch {
+  } catch (err) {
+    console.warn(`[iam] ${IAM_API.organizations} unreachable; showing the home org only:`, err);
     return fallback;
   }
 }
