@@ -57,7 +57,7 @@ export class PizzIntIndicator {
       .pizzint-indicator {
         position: relative;
         z-index: 1000;
-        font-family: 'JetBrains Mono', monospace;
+        font-family: var(--font-mono);
       }
       .pizzint-toggle {
         display: flex;
