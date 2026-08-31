@@ -87,8 +87,8 @@ type jsonRPCReq struct {
 //
 // Real telemetry (per network, from its public API, luxfi/node):
 //   - peers:       POST /v1/info  info.peers  → result.numPeers / len(result.peers)
-//   - blockHeight: POST /v1/bc/C/rpc  eth_blockNumber (hex)
-//   - chainId:     POST /v1/bc/C/rpc  eth_chainId (hex) — verifies the catalog default
+//   - blockHeight: POST /v1/chain/C/rpc  eth_blockNumber (hex)
+//   - chainId:     POST /v1/chain/C/rpc  eth_chainId (hex) — verifies the catalog default
 // live:true only when eth_blockNumber actually returned a height. An unreachable
 // network keeps its catalog identity but reports zero counts + live:false — never
 // an invented height.
@@ -113,7 +113,7 @@ const perChainTimeout = 4 * time.Second
 type chainKind int
 
 const (
-	// chainLuxNode: luxfi/node — POST /v1/info (info.peers) + /v1/bc/C/rpc
+	// chainLuxNode: luxfi/node — POST /v1/info (info.peers) + /v1/chain/C/rpc
 	// (eth_blockNumber / eth_chainId). Lux, Zoo, Hanzo.
 	chainLuxNode chainKind = iota
 	// chainEVM: a public EVM JSON-RPC endpoint — POST eth_blockNumber /
@@ -233,7 +233,7 @@ func (s *Server) fetchLuxNodeChain(ctx context.Context, cn chainNet) chainNetwor
 // leaving any field that fails at its current value (additive across hosts).
 func (s *Server) fillLuxNode(ctx context.Context, host string, out *chainNetwork) {
 	info := host + "/v1/info"
-	rpc := host + "/v1/bc/C/rpc"
+	rpc := host + "/v1/chain/C/rpc"
 
 	// peers (info.peers) — real count of connected peers, when the info API is exposed.
 	var pr struct {
