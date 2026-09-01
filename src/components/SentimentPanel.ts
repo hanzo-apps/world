@@ -5,7 +5,6 @@ import { sparkline as baseSparkline } from '@/utils/market-format';
 
 // Realtime news-sentiment panel — consumes /v1/world/sentiment (GDELT tone).
 // Global gauge + per-topic tiles + per-region bars, all 0-100 sentiment index
-// with 24h sparklines and velocity. Monochrome, Geist Mono numerics.
 
 interface Reading {
   tone: number | null;

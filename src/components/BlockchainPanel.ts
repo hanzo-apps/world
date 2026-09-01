@@ -80,7 +80,7 @@ export class BlockchainPanel extends Panel {
       // print a misleading "0 peers" beside a live head block.
       const peersCell = n.peers > 0
         ? `<span style="color:#555;">·</span>
-           <span data-net-peers="${i}" style="font-family:var(--font-mono);color:#888;min-width:2.5em;text-align:right;">${n.peers}</span>
+           <span data-net-peers="${i}" style="font-family:Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;color:#888;min-width:2.5em;text-align:right;">${n.peers}</span>
            <span style="color:#888;">peers</span>`
         : '';
       return `
@@ -88,7 +88,7 @@ export class BlockchainPanel extends Panel {
           <div style="display:flex;align-items:center;gap:8px;">
             <span style="color:${dot};font-size:9px;line-height:1;">&#9679;</span>
             <span style="flex:1;color:#ededed;font-weight:500;">${escapeHtml(n.name)}</span>
-            <span data-net-block="${i}" style="font-family:var(--font-mono);color:#ededed;">${n.blockHeight.toLocaleString()}</span>
+            <span data-net-block="${i}" style="font-family:Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;color:#ededed;">${n.blockHeight.toLocaleString()}</span>
             ${peersCell}
           </div>
           ${sub ? `<div style="color:#888;font-size:11px;padding-left:17px;">${sub}</div>` : ''}

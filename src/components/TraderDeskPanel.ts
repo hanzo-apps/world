@@ -6,7 +6,6 @@ import { fmtPct } from '@/utils/cloud-format';
 
 // Trader desk — consumes /v1/world/indicators. Dense stat tiles: value + change
 // + tiny sparkline + green/red, grouped into the classic risk suite. Monochrome,
-// Geist Mono numerics. Every field degrades to "—" when its source is down.
 
 interface Quote {
   symbol?: string;

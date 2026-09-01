@@ -5,7 +5,6 @@
  * collides with, nor depends on, main.css. Imported by AnalystChat.ts, so it
  * ships wherever the chat is mounted (dock, in-grid panel, country brief).
  *
- * Design canon: vercel-black monochrome, Geist, sentence case, the real Zen
  * mark as the only glyph brand. Tokens (--bg / --border / --text / --font-*)
  * come from main.css :root, so light/dark themes follow automatically.
  */
@@ -176,7 +175,7 @@ body.hzc-mode-fullscreen .hzc-resize {
   color: var(--text, #e8e8e8);
 }
 .hzc-head-title {
-  font: 500 13px/1 var(--font-body, sans-serif);
+  font: 500 13px/1 var(--font-sans, sans-serif);
   letter-spacing: -0.01em;
 }
 .hzc-modes {
@@ -260,7 +259,7 @@ body.hzc-mode-fullscreen .hzc-resize {
   border-radius: 15px 15px 4px 15px;
   background: var(--surface-active, #101010);
   color: var(--text, #e8e8e8);
-  font: 400 13.5px/1.5 var(--font-body, sans-serif);
+  font: 400 13.5px/1.5 var(--font-sans, sans-serif);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -345,7 +344,7 @@ body.hzc-mode-fullscreen .hzc-resize {
   padding-top: 4px;
 }
 .hzc-think-label {
-  font: 400 12.5px var(--font-body, sans-serif);
+  font: 400 12.5px var(--font-sans, sans-serif);
   color: var(--text-dim, #888);
 }
 
@@ -353,7 +352,7 @@ body.hzc-mode-fullscreen .hzc-resize {
 
 .hzc-md {
   color: var(--text-secondary, #ccc);
-  font: 400 13.5px/1.62 var(--font-body, sans-serif);
+  font: 400 13.5px/1.62 var(--font-sans, sans-serif);
   overflow-wrap: anywhere;
 }
 .hzc-md > *:first-child {
@@ -500,7 +499,7 @@ body.hzc-mode-fullscreen .hzc-resize {
   outline: none;
   background: transparent;
   color: var(--text, #e8e8e8);
-  font: 400 14px/1.5 var(--font-body, sans-serif);
+  font: 400 14px/1.5 var(--font-sans, sans-serif);
   max-height: 160px;
   overflow-y: auto;
 }
@@ -542,7 +541,7 @@ body.hzc-mode-fullscreen .hzc-resize {
   flex: 0 0 auto;
 }
 .hzc-model-name {
-  font: 500 12px var(--font-body, sans-serif);
+  font: 500 12px var(--font-sans, sans-serif);
   /* Compact: the pill should read as a small chip, not a wide bar. The selected
      model label is truncated to keep the footer tidy; the full list is still in
      the menu. */
@@ -589,7 +588,7 @@ body.hzc-mode-fullscreen .hzc-resize {
   border-radius: 7px;
   background: transparent;
   color: var(--text-dim, #999);
-  font: 500 12px var(--font-body, sans-serif);
+  font: 500 12px var(--font-sans, sans-serif);
   text-align: left;
   cursor: pointer;
 }
@@ -626,7 +625,7 @@ body.hzc-mode-fullscreen .hzc-resize {
 .hzc-stream-think {
   white-space: pre-wrap;
   margin-bottom: 4px;
-  font: 400 11.5px var(--font-body, sans-serif);
+  font: 400 11.5px var(--font-sans, sans-serif);
   font-style: italic;
   color: var(--text-muted, #666);
 }
@@ -791,7 +790,7 @@ body.hzc-mode-fullscreen .hzc-resize {
   display: flex;
   align-items: center;
   gap: 8px;
-  font: 400 12px/1.4 var(--font-body, sans-serif);
+  font: 400 12px/1.4 var(--font-sans, sans-serif);
   color: var(--text-dim, #888);
 }
 .hzc-action-mark {
@@ -806,7 +805,7 @@ body.hzc-mode-fullscreen .hzc-resize {
   color: var(--text, #e8e8e8);
 }
 .hzc-inline {
-  font: 400 12.5px/1.5 var(--font-body, sans-serif);
+  font: 400 12.5px/1.5 var(--font-sans, sans-serif);
   color: var(--text-dim, #888);
 }
 .hzc-error {
@@ -824,7 +823,7 @@ body.hzc-mode-fullscreen .hzc-resize {
   background: var(--surface-hover, #0a0a0a);
 }
 .hzc-topup-msg {
-  font: 500 12.5px/1.4 var(--font-body, sans-serif);
+  font: 500 12.5px/1.4 var(--font-sans, sans-serif);
   color: var(--text, #e8e8e8);
 }
 .hzc-topup-actions {
@@ -838,7 +837,7 @@ body.hzc-mode-fullscreen .hzc-resize {
   border-radius: var(--radius-sm, 6px);
   background: var(--text, #e8e8e8);
   color: var(--bg, #000);
-  font: 600 12px/1 var(--font-body, sans-serif);
+  font: 600 12px/1 var(--font-sans, sans-serif);
   text-decoration: none;
 }
 .hzc-topup-btn:hover {
@@ -846,7 +845,7 @@ body.hzc-mode-fullscreen .hzc-resize {
 }
 .hzc-topup-link {
   color: var(--text-dim, #888);
-  font: 400 12px/1 var(--font-body, sans-serif);
+  font: 400 12px/1 var(--font-sans, sans-serif);
   text-decoration: none;
 }
 .hzc-topup-link:hover {
@@ -872,7 +871,7 @@ body.hzc-mode-fullscreen .hzc-resize {
   opacity: 0.92;
 }
 .hzc-empty-title {
-  font: 500 15px/1.4 var(--font-body, sans-serif);
+  font: 500 15px/1.4 var(--font-sans, sans-serif);
   color: var(--text, #e8e8e8);
   letter-spacing: -0.01em;
   max-width: 280px;
@@ -889,7 +888,7 @@ body.hzc-mode-fullscreen .hzc-resize {
   border-radius: var(--radius-pill, 999px);
   background: transparent;
   color: var(--text-dim, #888);
-  font: 400 12.5px var(--font-body, sans-serif);
+  font: 400 12.5px var(--font-sans, sans-serif);
   cursor: pointer;
   transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
 }
@@ -902,12 +901,12 @@ body.hzc-mode-fullscreen .hzc-resize {
   gap: 10px;
 }
 .hzc-signedout-title {
-  font: 600 15px var(--font-body, sans-serif);
+  font: 600 15px var(--font-sans, sans-serif);
   color: var(--text, #e8e8e8);
   margin: 0;
 }
 .hzc-signedout-sub {
-  font: 400 13px/1.5 var(--font-body, sans-serif);
+  font: 400 13px/1.5 var(--font-sans, sans-serif);
   color: var(--text-dim, #888);
   max-width: 260px;
   margin: 0;
@@ -919,7 +918,7 @@ body.hzc-mode-fullscreen .hzc-resize {
   border-radius: var(--radius-sm, 6px);
   background: var(--accent, #fff);
   color: var(--accent-fg, #000);
-  font: 500 13px var(--font-body, sans-serif);
+  font: 500 13px var(--font-sans, sans-serif);
   cursor: pointer;
 }
 .hzc-signin:hover {

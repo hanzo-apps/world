@@ -60,9 +60,8 @@
   --map-country: #0a2018;
   --map-stroke: #0f5040;
 
-  /* Font stack — Hanzo: Geist Sans (UI) + Geist Mono (data/numeric) */
-  --font-body: 'Geist', system-ui, -apple-system, sans-serif;
-  --font-mono: 'Geist Mono', 'SF Mono', 'Monaco', monospace;
+  --font-sans: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 
   /* Radius scale — @hanzo/gui token (soft, Vercel-like) */
   --radius: 8px;        /* panels, modals, cards */
@@ -94,34 +93,20 @@
   --world-down: var(--red);
   --world-live: var(--status-live);
   --world-stale: var(--status-cached);
-  --world-font-sans: var(--font-body);
-  --world-font-mono: var(--font-mono);
+  --world-font-sans: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --world-font-mono: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   --world-radius: var(--radius);
   --world-radius-sm: var(--radius-sm);
   --world-transition: 150ms ease;
 }
 
-/* Self-hosted Geist (no CDN — CSP-safe), from @hanzo/gui / Hanzo brand pack */
-@font-face {
-  font-family: 'Geist';
-  src: url('/fonts/GeistVF.woff2') format('woff2');
-  font-weight: 100 900;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Geist Mono';
-  src: url('/fonts/GeistMonoVF.woff2') format('woff2');
-  font-weight: 100 900;
-  font-display: swap;
-}
-
 [dir="rtl"] {
-  --font-body: 'Geeza Pro', 'SF Arabic', 'Tahoma', system-ui, sans-serif;
+  --font-sans: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 :lang(zh-CN),
 :lang(zh) {
-  --font-body: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', system-ui, sans-serif;
+  --font-sans: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 /* ============================================================
@@ -257,7 +242,7 @@ html {
 }
 
 body {
-  font-family: var(--font-body);
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
   line-height: 1.5;
   background: var(--bg);
@@ -610,7 +595,7 @@ button.header-logo[aria-expanded="true"] { opacity: 1; }
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
   cursor: pointer;
   appearance: none;
@@ -648,7 +633,7 @@ button.header-logo[aria-expanded="true"] { opacity: 1; }
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 11px;
   cursor: pointer;
   appearance: none;
@@ -719,7 +704,7 @@ button.header-logo[aria-expanded="true"] { opacity: 1; }
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
@@ -737,7 +722,7 @@ button.header-logo[aria-expanded="true"] { opacity: 1; }
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-dim);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 14px;
   cursor: pointer;
   line-height: 1;
@@ -775,7 +760,7 @@ button.header-logo[aria-expanded="true"] { opacity: 1; }
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-dim);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
   cursor: pointer;
   display: flex;
@@ -797,7 +782,7 @@ button.header-logo[aria-expanded="true"] { opacity: 1; }
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
   cursor: pointer;
   transition: all 0.15s;
@@ -820,7 +805,7 @@ button.header-logo[aria-expanded="true"] { opacity: 1; }
   padding: 1px 5px;
   border-radius: var(--radius-sm);
   font-size: 10px;
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   color: var(--text-dim);
 }
 
@@ -835,7 +820,7 @@ button.header-logo[aria-expanded="true"] { opacity: 1; }
   gap: 7px;
   height: 30px;
   padding: 0 16px;
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -1022,7 +1007,7 @@ textarea:focus-visible,
   bottom: 8px;
   z-index: 3;
   font-size: 10px;
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   color: var(--text-dim);
   letter-spacing: 0.3px;
   pointer-events: none;
@@ -1315,7 +1300,7 @@ body.panel-drag-active .map-container {
 }
 
 .panel-count {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-variant-numeric: tabular-nums;
   font-size: 10px;
   color: var(--text-dim);
@@ -1353,7 +1338,7 @@ body.panel-drag-active .map-container {
 [class*="-metric-value"],
 .deckgl-time-slider .time-btn,
 .time-btn {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1507,7 +1492,7 @@ body.panel-drag-active .map-container {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 11px;
   line-height: 1;
   padding: 3px 8px;
@@ -1734,7 +1719,7 @@ body.panel-drag-active .map-container {
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   color: var(--text-dim);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
@@ -1990,7 +1975,7 @@ body.panel-drag-active .map-container {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-dim);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 10px;
   cursor: pointer;
   transition: all 0.2s;
@@ -2058,7 +2043,7 @@ body.panel-drag-active .map-container {
 }
 
 .webcam-city {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   font-weight: 600;
   color: #fff;
@@ -2109,7 +2094,7 @@ body.panel-drag-active .map-container {
   align-items: center;
   justify-content: center;
   color: var(--text-dim, #7a8290);
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 11px;
   padding: 24px;
 }
@@ -2172,7 +2157,7 @@ body.panel-drag-active .map-container {
 }
 
 .stations-name {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   font-weight: 600;
   color: #fff;
@@ -2194,7 +2179,7 @@ body.panel-drag-active .map-container {
 
 .stations-offline::after {
   content: 'offline';
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   color: var(--text-dim, #7a8290);
   letter-spacing: 1px;
@@ -2215,7 +2200,7 @@ body.panel-drag-active .map-container {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-dim);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 10px;
   cursor: pointer;
   transition: all 0.2s;
@@ -2480,7 +2465,7 @@ body.panel-drag-active .map-container {
   border-radius: 12px;
   cursor: pointer;
   font-size: 11px;
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   transition: background 0.2s, color 0.2s;
 }
 
@@ -3316,7 +3301,7 @@ body.playback-mode .status-dot {
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   color: var(--text-dim);
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -3351,7 +3336,7 @@ body.playback-mode .status-dot {
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text-dim);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 9px;
   cursor: pointer;
   text-transform: none;
@@ -3406,7 +3391,7 @@ body.playback-mode .status-dot {
   border: 1px solid var(--border);
   border-radius: 50%;
   color: var(--text-dim);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
@@ -5042,7 +5027,7 @@ details.mkt-group > summary.mkt-group-label:hover {
 .mkt-sub {
   font-size: 9px;
   color: var(--text-dim);
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
 .mkt-spark-wrap {
@@ -5060,7 +5045,7 @@ details.mkt-group > summary.mkt-group-label:hover {
 }
 
 .mkt-val {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 12px;
   font-weight: 600;
   color: var(--text);
@@ -5068,7 +5053,7 @@ details.mkt-group > summary.mkt-group-label:hover {
 }
 
 .mkt-chg {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   text-align: right;
   min-width: 88px;
@@ -5104,7 +5089,7 @@ details.mkt-group > summary.mkt-group-label:hover {
 }
 
 .mkt-spread-val {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 12px;
   font-weight: 600;
 }
@@ -5200,7 +5185,7 @@ a.prediction-link:hover {
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 11px;
   margin-bottom: 8px;
 }
@@ -5216,7 +5201,7 @@ a.prediction-link:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -5368,7 +5353,7 @@ a.prediction-link:hover {
   border: 1px solid rgba(255, 210, 124, 0.3);
   border-radius: 3px;
   cursor: pointer;
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 .config-error-settings-btn:hover {
@@ -5503,7 +5488,7 @@ a.prediction-link:hover {
   flex: none;
   height: 30px;
   padding: 0 14px;
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
   font-weight: 500;
   color: var(--text);
@@ -5529,7 +5514,7 @@ a.prediction-link:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
@@ -5562,7 +5547,7 @@ a.prediction-link:hover {
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 11px;
 }
 
@@ -5633,7 +5618,7 @@ a.prediction-link:hover {
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 10px;
   cursor: pointer;
   text-transform: none;
@@ -7313,7 +7298,7 @@ a.prediction-link:hover {
 .indicator-id {
   font-size: 9px;
   color: var(--text-dim);
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
 .indicator-value {
@@ -7588,7 +7573,7 @@ a.prediction-link:hover {
   background: transparent;
   border: none;
   color: var(--text);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 14px;
   outline: none;
 }
@@ -7603,7 +7588,7 @@ a.prediction-link:hover {
   background: var(--border);
   padding: 2px 6px;
   border-radius: 3px;
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 .search-results {
@@ -7958,14 +7943,14 @@ a.prediction-link:hover {
   white-space: nowrap;
   text-shadow: 0 0 3px var(--shadow-color), 0 0 6px var(--shadow-color);
   font-weight: 600;
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   opacity: 0.8;
 }
 
 .military-flight-altitude {
   font-size: 6px;
   color: var(--text-dim);
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   opacity: 0.6;
   text-shadow: 0 0 2px var(--shadow-color);
 }
@@ -8228,7 +8213,7 @@ a.prediction-link:hover {
   font-size: 12px;
   font-weight: 600;
   color: var(--cluster-color);
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   text-shadow: 0 0 4px var(--shadow-color);
   position: relative;
   padding: 4px 8px;
@@ -8265,7 +8250,7 @@ a.prediction-link:hover {
   margin-top: 3px;
   white-space: nowrap;
   font-weight: 600;
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   text-shadow: 0 0 3px var(--shadow-color);
   opacity: 0.85;
   position: relative;
@@ -8703,7 +8688,7 @@ a.prediction-link:hover {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 .mobile-warning-btn:hover {
@@ -9073,7 +9058,7 @@ a.prediction-link:hover {
   border-bottom: 2px solid transparent;
   color: var(--text-dim);
   font-size: 11px;
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   cursor: pointer;
   transition: all 0.15s ease;
   white-space: nowrap;
@@ -9266,7 +9251,7 @@ a.prediction-link:hover {
   font-size: 14px;
   font-weight: 600;
   color: var(--accent);
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
 .cii-header .trend-up {
@@ -9303,7 +9288,7 @@ a.prediction-link:hover {
   gap: 8px;
   font-size: 10px;
   color: var(--text-dim);
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
 .cii-components span {
@@ -10693,7 +10678,7 @@ a.prediction-link:hover {
   border-radius: 4px;
   color: var(--semantic-low);
   padding: 4px 10px;
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 12px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -10746,7 +10731,7 @@ a.prediction-link:hover {
 }
 
 .news-correlation-text {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   color: var(--text);
   white-space: pre-wrap;
@@ -11879,7 +11864,7 @@ a.prediction-link:hover {
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 10px;
   cursor: pointer;
 }
@@ -11918,7 +11903,7 @@ a.prediction-link:hover {
   border-radius: 999px;
   border-radius: var(--radius-pill);
   color: var(--text-dim);
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -11956,7 +11941,7 @@ a.prediction-link:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   color: var(--text-dim);
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   letter-spacing: 0.04em;
   cursor: pointer;
@@ -12183,7 +12168,7 @@ a.prediction-link:hover {
   border-radius: 3px;
   font-size: 9px;
   color: var(--text-dim);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   letter-spacing: 0.5px;
 }
 
@@ -12207,7 +12192,7 @@ a.prediction-link:hover {
 /* mapbox-gl (and legacy maplibre) GL overrides for dark theme */
 .maplibregl-map,
 .mapboxgl-map {
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background: transparent !important;
 }
 
@@ -14251,7 +14236,7 @@ body.has-critical-banner .panels-grid {
 .stable-price {
   font-size: 12px;
   color: var(--accent);
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
 .stable-peg {
@@ -14381,7 +14366,7 @@ body.has-critical-banner .panels-grid {
 }
 
 .sent-gauge-value {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 34px;
   font-weight: 600;
   line-height: 1;
@@ -14445,7 +14430,7 @@ body.has-critical-banner .panels-grid {
 }
 
 .sent-vel {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
@@ -14482,7 +14467,7 @@ body.has-critical-banner .panels-grid {
 }
 
 .sent-topic-idx {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 15px;
   font-weight: 600;
   color: var(--accent);
@@ -14559,7 +14544,7 @@ body.has-critical-banner .panels-grid {
 }
 
 .sent-region-idx {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 12px;
   font-weight: 600;
   width: 26px;
@@ -14601,7 +14586,7 @@ body.has-critical-banner .panels-grid {
   margin: 10px 4px 4px;
 }
 .td-section-sub {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   color: var(--text-faint);
   font-weight: 500;
   margin-left: 6px;
@@ -14636,7 +14621,7 @@ body.has-critical-banner .panels-grid {
 }
 
 .td-risk-value {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 24px;
   font-weight: 600;
   line-height: 1.1;
@@ -14685,7 +14670,7 @@ body.has-critical-banner .panels-grid {
   background: var(--overlay-light);
 }
 .td-fg-value {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 24px;
   font-weight: 600;
   line-height: 1.1;
@@ -14755,7 +14740,7 @@ body.has-critical-banner .panels-grid {
   text-overflow: ellipsis;
 }
 .td-tile-val {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 15px;
   font-weight: 600;
   color: var(--accent);
@@ -14780,14 +14765,14 @@ body.has-critical-banner .panels-grid {
   font-size: 9px;
   color: var(--text-faint);
   margin-top: 2px;
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .td-chg {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
@@ -14818,7 +14803,7 @@ body.has-critical-banner .panels-grid {
   color: var(--text-muted);
 }
 .td-spread-val {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 16px;
   font-weight: 600;
   color: var(--accent);
@@ -14862,7 +14847,7 @@ body.has-critical-banner .panels-grid {
   color: var(--text-faint);
 }
 .td-yield-val {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 12px;
   font-weight: 600;
   color: var(--accent);
@@ -14895,7 +14880,7 @@ body.has-critical-banner .panels-grid {
   color: var(--accent);
 }
 .td-sec-chg {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
@@ -15420,7 +15405,7 @@ body.has-critical-banner .panels-grid {
   background: none;
   border: none;
   color: var(--accent);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
   text-align: left;
   border-radius: 6px;
@@ -15845,7 +15830,7 @@ body.has-critical-banner .panels-grid {
   align-self: flex-start; background: var(--surface); color: var(--text-secondary);
   border-bottom-left-radius: 3px;
 }
-.ai-analyst-num { font-family: var(--font-mono); font-size: 12.5px; }
+.ai-analyst-num { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12.5px; }
 
 .ai-analyst-inline {
   align-self: center; max-width: 92%; text-align: center;
@@ -15909,7 +15894,7 @@ body.has-critical-banner .panels-grid {
 a.custom-feed-item:hover { background: var(--surface-hover); }
 .custom-feed-title { font-size: 12.5px; line-height: 1.45; color: var(--text-secondary); }
 a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
-.custom-feed-time { margin-top: 3px; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-muted); }
+.custom-feed-time { margin-top: 3px; font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 10.5px; color: var(--text-muted); }
 
 /* ── Floating AI analyst dock (bottom-right launcher) ──────────────────────
    Always-available launcher on every variant. Subtle round button, pure-black
@@ -15970,14 +15955,14 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
   margin-bottom: 10px;
 }
 .cloud-scope {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 11px;
   letter-spacing: 0.02em;
   color: var(--text-dim);
   text-transform: uppercase;
 }
 .cloud-live-note {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -15985,7 +15970,7 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
   white-space: nowrap;
 }
 .cloud-demo-note {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -16020,7 +16005,7 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
   min-width: 0;
 }
 .cloud-stat-value {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 18px;
   font-weight: 600;
   color: var(--text);
@@ -16037,7 +16022,7 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
   text-overflow: ellipsis;
 }
 .cloud-stat-sub {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 9px;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -16054,7 +16039,7 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
   color: var(--text);
 }
 .cloud-spark-label {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   color: var(--text-dim);
   text-transform: uppercase;
@@ -16078,11 +16063,11 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
   gap: 6px;
   min-width: 0;
 }
-.cloud-model-req { font-family: var(--font-mono); font-size: 12px; color: var(--text); white-space: nowrap; }
+.cloud-model-req { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; color: var(--text); white-space: nowrap; }
 .cloud-unit { font-size: 9px; color: var(--text-muted); margin-left: 3px; text-transform: uppercase; }
-.cloud-model-sub { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); margin-top: 3px; }
+.cloud-model-sub { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 10px; color: var(--text-dim); margin-top: 3px; }
 .cloud-tag {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 9px;
   text-transform: uppercase;
   color: var(--green);
@@ -16122,7 +16107,7 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 .cloud-fleet-name { font-size: 12px; color: var(--text); }
 .cloud-fleet-sub { font-size: 10px; color: var(--text-dim); }
 .cloud-fleet-metrics { display: flex; gap: 12px; flex: 0 0 auto; }
-.cloud-fleet-nodes, .cloud-fleet-gpus { font-family: var(--font-mono); font-size: 12px; color: var(--text); white-space: nowrap; }
+.cloud-fleet-nodes, .cloud-fleet-gpus { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; color: var(--text); white-space: nowrap; }
 
 /* My usage / bill */
 .cloud-usage-list { display: flex; flex-direction: column; margin-top: 10px; }
@@ -16136,8 +16121,8 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 }
 .cloud-usage-row:last-child { border-bottom: none; }
 .cloud-usage-label { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cloud-usage-when { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
-.cloud-usage-amt { font-family: var(--font-mono); font-size: 12px; color: var(--text); }
+.cloud-usage-when { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 10px; color: var(--text-dim); }
+.cloud-usage-amt { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; color: var(--text); }
 .cloud-bill-link, .cloud-empty a, .panel-empty a {
   display: inline-block;
   margin-top: 12px;
@@ -16177,7 +16162,7 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 .fw-panel { gap: 10px; }
 .fw-hero { text-align: center; padding: 4px 0 2px; }
 .fw-hero-value {
-  font-family: var(--font-mono, 'Geist Mono', ui-monospace, monospace);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-weight: 600; font-size: 34px; line-height: 1.05; letter-spacing: -0.02em;
   color: var(--text); font-variant-numeric: tabular-nums;
 }
@@ -16211,7 +16196,7 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 .cloud-signin-body { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
 .cloud-signin-btn {
   margin-top: 4px;
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 12px;
   color: var(--bg);
   background: var(--text);
@@ -16226,7 +16211,7 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 .cloud-activity-head { display: flex; align-items: center; justify-content: space-between; }
 .cloud-activity-big { display: flex; flex-direction: column; }
 .cloud-activity-num {
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 34px;
   font-weight: 700;
   color: var(--text);
@@ -16250,7 +16235,7 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 .cloud-activity-rname { font-size: 11px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cloud-activity-rbar { height: 5px; background: var(--border); border-radius: var(--radius-pill); overflow: hidden; }
 .cloud-activity-rbar span { display: block; height: 100%; background: var(--text); border-radius: var(--radius-pill); }
-.cloud-activity-rrate { font-family: var(--font-mono); font-size: 11px; color: var(--text); white-space: nowrap; }
+.cloud-activity-rrate { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 11px; color: var(--text); white-space: nowrap; }
 .cloud-activity-foot { margin-top: 12px; margin-bottom: 0; }
 
 /* ── Admin Cloud console panels (services / fleet / analytics / LLM obs) ──── */
@@ -16261,7 +16246,7 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 /* admin-only gate state */
 .cloud-admin-gate { padding: 18px 6px; }
 .cloud-admin-gate-title {
-  font-family: var(--font-mono); font-size: 11px; text-transform: uppercase;
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 11px; text-transform: uppercase;
   letter-spacing: 0.05em; color: var(--text-dim);
   border: 1px solid var(--border); border-radius: var(--radius-pill);
   padding: 2px 9px; display: inline-block; margin-bottom: 8px;
@@ -16269,7 +16254,7 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 .cloud-admin-gate-body { font-size: 12px; color: var(--text-dim); line-height: 1.5; max-width: 46ch; }
 
 .cloud-subhead {
-  font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 10px; text-transform: uppercase;
   letter-spacing: 0.04em; color: var(--text-dim); margin: 12px 0 7px;
 }
 
@@ -16278,9 +16263,9 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 .cloud-svc-row { display: flex; align-items: center; gap: 9px; padding: 7px 2px; border-bottom: 1px solid var(--border); }
 .cloud-svc-row:last-child { border-bottom: none; }
 .cloud-svc-name { flex: 1 1 auto; min-width: 0; font-size: 12px; color: var(--text); display: flex; align-items: center; gap: 7px; }
-.cloud-svc-deploys { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }
+.cloud-svc-deploys { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 9px; color: var(--text-muted); }
 .cloud-svc-metrics { display: flex; gap: 12px; flex: 0 0 auto; }
-.cloud-svc-metric { font-family: var(--font-mono); font-size: 11px; color: var(--text); white-space: nowrap; }
+.cloud-svc-metric { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 11px; color: var(--text); white-space: nowrap; }
 .cloud-svc-nodata { color: var(--text-muted); font-style: italic; }
 
 /* deep fleet */
@@ -16288,34 +16273,34 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 .cloud-provider-group { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; }
 .cloud-provider-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .cloud-provider-name { font-size: 13px; font-weight: 600; color: var(--text); text-transform: capitalize; }
-.cloud-provider-meta { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); }
+.cloud-provider-meta { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 10px; color: var(--text-dim); }
 .cloud-region-group { margin-top: 6px; }
-.cloud-region-head { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; margin: 5px 0 3px; }
+.cloud-region-head { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; margin: 5px 0 3px; }
 .cloud-region-meta { color: var(--text-muted); text-transform: none; letter-spacing: 0; }
 .cloud-machine-row { display: flex; align-items: center; gap: 8px; padding: 4px 0 4px 10px; }
 .cloud-machine-name { flex: 1 1 auto; min-width: 0; font-size: 12px; color: var(--text); display: flex; align-items: baseline; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cloud-machine-type { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }
-.cloud-machine-gpu { font-family: var(--font-mono); font-size: 11px; color: var(--text); white-space: nowrap; }
+.cloud-machine-type { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 9px; color: var(--text-muted); }
+.cloud-machine-gpu { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 11px; color: var(--text); white-space: nowrap; }
 .cloud-fleet-workers { margin-top: 4px; }
 .cloud-worker-row { display: grid; grid-template-columns: 14px 1fr auto; gap: 8px; align-items: center; padding: 4px 0; }
 .cloud-worker-name { font-size: 12px; color: var(--text); }
-.cloud-worker-gpu { font-family: var(--font-mono); font-size: 11px; color: var(--text); white-space: nowrap; }
-.cloud-worker-caps { grid-column: 2 / 4; font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }
-.cloud-worker-serving { grid-column: 2 / 4; font-family: var(--font-mono); font-size: 9.5px; color: var(--text-dim); display: inline-flex; align-items: center; gap: 4px; }
+.cloud-worker-gpu { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 11px; color: var(--text); white-space: nowrap; }
+.cloud-worker-caps { grid-column: 2 / 4; font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 9px; color: var(--text-muted); }
+.cloud-worker-serving { grid-column: 2 / 4; font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 9.5px; color: var(--text-dim); display: inline-flex; align-items: center; gap: 4px; }
 .cloud-util-note { margin-top: 12px; font-size: 10.5px; color: var(--text-muted); line-height: 1.45; }
 
 /* clusters (DOKS nodes by cluster) + gpu-jobs queue — SuperAdmin fleet view */
 .cloud-cluster-group { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px 10px; margin-top: 8px; }
 .cloud-cluster-head { display: flex; align-items: center; gap: 8px; }
 .cloud-cluster-name { flex: 1 1 auto; min-width: 0; font-size: 12.5px; color: var(--text); font-weight: 600; }
-.cloud-cluster-kind { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1px 5px; margin-left: 6px; }
-.cloud-cluster-meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); white-space: nowrap; }
-.cloud-cluster-pools { font-family: var(--font-mono); font-size: 9.5px; color: var(--text-muted); margin: 4px 0 2px; }
+.cloud-cluster-kind { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1px 5px; margin-left: 6px; }
+.cloud-cluster-meta { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 10.5px; color: var(--text-dim); white-space: nowrap; }
+.cloud-cluster-pools { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 9.5px; color: var(--text-muted); margin: 4px 0 2px; }
 .cloud-queue-job { display: grid; grid-template-columns: 14px 1fr auto; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border); }
 .cloud-queue-job:last-child { border-bottom: none; }
 .cloud-queue-what { min-width: 0; font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cloud-queue-svc { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1px 5px; margin-right: 6px; }
-.cloud-queue-meta { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-dim); white-space: nowrap; }
+.cloud-queue-svc { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1px 5px; margin-right: 6px; }
+.cloud-queue-meta { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 10.5px; color: var(--text-dim); white-space: nowrap; }
 .cloud-pulse-dot { animation: cloud-pulse 1.6s ease-in-out infinite; }
 @keyframes cloud-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
@@ -16328,12 +16313,12 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 .cloud-an-row { display: grid; grid-template-columns: minmax(0, 1fr) 64px auto; gap: 8px; align-items: center; padding: 4px 0; }
 .cloud-an-label { font-size: 11.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cloud-an-bar { min-width: 0; }
-.cloud-an-val { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); white-space: nowrap; text-align: right; }
+.cloud-an-val { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 11px; color: var(--text-dim); white-space: nowrap; text-align: right; }
 
 /* range switch (LLM obs) */
 .cloud-range { display: inline-flex; gap: 3px; }
 .cloud-range-btn {
-  font-family: var(--font-mono); font-size: 10px; cursor: pointer;
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 10px; cursor: pointer;
   color: var(--text-dim); background: transparent;
   border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 2px 7px;
 }
@@ -16353,7 +16338,7 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
 }
 .ai-analyst-model {
   appearance: none; -webkit-appearance: none;
-  font-family: var(--font-mono); font-size: 11.5px; color: var(--text);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 11.5px; color: var(--text);
   background: transparent; border: 1px solid var(--border);
   border-radius: var(--radius-sm); padding: 3px 22px 3px 8px; cursor: pointer;
   background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%),
@@ -16379,7 +16364,7 @@ a.custom-feed-item:hover .custom-feed-title { color: var(--text); }
   display: flex; gap: 6px; align-items: baseline;
   font-size: 11.5px; color: var(--text-dim); line-height: 1.4;
 }
-.ai-analyst-action-mark { font-family: var(--font-mono); flex: 0 0 auto; }
+.ai-analyst-action-mark { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; flex: 0 0 auto; }
 .ai-analyst-action.ok .ai-analyst-action-mark { color: var(--text); }
 .ai-analyst-action.err { color: var(--text-muted); }
 .ai-analyst-action.err .ai-analyst-action-mark { color: var(--red); }
@@ -16794,7 +16779,7 @@ body.immersive .immersive-controls {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s, color 0.15s;
@@ -16830,7 +16815,7 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
   border: none;
   border-radius: var(--radius-pill);
   color: var(--text-dim);
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   letter-spacing: 0.04em;
   cursor: pointer;
@@ -16869,7 +16854,7 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
   border: none;
   border-radius: var(--radius-pill);
   color: var(--text-dim);
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   letter-spacing: 0.04em;
   cursor: pointer;
@@ -16938,7 +16923,7 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
 .ai-analyst-tool { font-size: 11.5px; color: var(--text-dim); }
 .ai-analyst-tool-summary {
   cursor: pointer; list-style: none; line-height: 1.5;
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   color: var(--text-dim);
   transition: color 0.12s ease;
 }
@@ -16949,7 +16934,7 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
 .ai-analyst-tool-result {
   margin: 3px 0 4px; padding: 6px 8px;
   max-height: 220px; overflow: auto;
-  font-family: var(--font-mono); font-size: 10.5px; line-height: 1.45;
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 10.5px; line-height: 1.45;
   color: var(--text-dim);
   white-space: pre-wrap; word-break: break-word;
   background: var(--overlay-medium); border-radius: 4px;
@@ -17073,7 +17058,7 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
   line-height: 1;
   white-space: nowrap;
@@ -17106,7 +17091,7 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
   border: none;
   border-radius: var(--radius-pill);
   color: var(--text-dim);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 11px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
@@ -17124,7 +17109,7 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
   line-height: 1;
   cursor: pointer;
@@ -17217,7 +17202,7 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
   padding: 5px 12px;
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  color: var(--text); font-family: var(--font-mono); font-size: 10px;
+  color: var(--text); font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 10px;
   letter-spacing: 0.04em; cursor: pointer; transition: all .15s ease; white-space: nowrap;
 }
 .deckgl-dd .dd-trigger:hover { border-color: var(--border-strong); }
@@ -17253,7 +17238,7 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   color: var(--text-dim);
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   letter-spacing: 0.04em;
   cursor: pointer;
@@ -17280,7 +17265,7 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 13px;
 }
 .add-widget-search input:focus { outline: none; border-color: var(--accent); }
@@ -17302,7 +17287,7 @@ body.immersive .immersive-collapse-btn { display: inline-flex; }
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   color: var(--text);
-  font-family: inherit;
+  font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   font-size: 12px;
   text-align: left;
   cursor: pointer;
@@ -17579,7 +17564,7 @@ body.layout-free .panels-grid::after {
    Theme-safe via var(--*) tokens (flip light/dark automatically). Wide tables
    scroll INSIDE .enso-bm-wrap (overflow-x) so the page body never scrolls. */
 .enso-bm-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 6px 0 2px; }
-.enso-bm-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 11px; }
+.enso-bm-table { width: 100%; border-collapse: collapse; font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 11px; }
 .enso-bm-table th { text-align: left; color: var(--text-dim); font-weight: 500; padding: 5px 9px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 .enso-bm-table td { padding: 5px 9px; border-bottom: 1px solid var(--border-subtle); color: var(--text-secondary); white-space: nowrap; vertical-align: top; }
 .enso-bm-table td.num, .enso-bm-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -17593,7 +17578,7 @@ body.layout-free .panels-grid::after {
 .enso-bm-tag-arm { opacity: 0.6; }
 .enso-bm-abl { margin: 8px 0 4px; }
 .enso-bm-abl-name { font-size: 11px; color: var(--text-dim); margin-bottom: 2px; }
-.enso-bm-delta { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 4px; font-family: var(--font-mono); font-size: 11px; }
+.enso-bm-delta { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 4px; font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 11px; }
 .enso-bm-up { color: var(--green); }
 .enso-bm-down { color: var(--text-dim); }
 .enso-bm-foot { margin: 6px 0 2px; padding-left: 16px; color: var(--text-muted); font-size: 10.5px; line-height: 1.55; }
@@ -17607,7 +17592,7 @@ body.layout-free .panels-grid::after {
 }
 .enso-slider-row { display: flex; align-items: center; gap: 12px; }
 .enso-slider-end {
-  font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 10px; text-transform: uppercase;
   letter-spacing: 0.04em; color: var(--text-dim); flex: 0 0 auto; white-space: nowrap;
 }
 .enso-slider {
@@ -17637,11 +17622,11 @@ body.layout-free .panels-grid::after {
   gap: 8px; margin-top: 8px;
 }
 .enso-slider-val {
-  font-family: var(--font-mono); font-size: 12px; color: var(--text);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 12px; color: var(--text);
   text-transform: uppercase; letter-spacing: 0.02em;
 }
 .enso-slider-saved {
-  font-family: var(--font-mono); font-size: 10px; text-transform: uppercase;
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 10px; text-transform: uppercase;
   letter-spacing: 0.03em; opacity: 0; transition: opacity 0.2s ease; white-space: nowrap;
 }
 .enso-slider-saved.show { opacity: 1; }
@@ -17652,7 +17637,7 @@ body.layout-free .panels-grid::after {
 .enso-router-judge { margin-top: 6px; }
 
 /* ── Rotation scanner (RRG sector-rotation panel) ─────────────────────────── */
-.rot { display: flex; flex-direction: column; gap: 10px; padding: 4px 2px; font-family: var(--font-mono); }
+.rot { display: flex; flex-direction: column; gap: 10px; padding: 4px 2px; font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
 .rot-na { color: var(--text-dim); font-size: 12px; padding: 12px 6px; text-align: center; }
 
 .rot-signals { display: flex; flex-direction: column; gap: 5px; }
@@ -17673,11 +17658,11 @@ body.layout-free .panels-grid::after {
 .rot-sig-watch .rot-sig-bar > span { background: #f5a623; }
 .rot-sig-off { border-left-color: var(--border-strong); }
 
-.rot-narrative { font-size: 11.5px; line-height: 1.5; color: var(--text-dim); font-family: var(--font-body); }
+.rot-narrative { font-size: 11.5px; line-height: 1.5; color: var(--text-dim); font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
 
 .rot-rrg { width: 100%; height: auto; display: block; margin: 2px auto; max-width: 300px; }
-.rot-quad-lbl { font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.1em; opacity: 0.65; }
-.rot-dot-lbl { font-family: var(--font-mono); font-size: 8.5px; fill: var(--text-secondary); }
+.rot-quad-lbl { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 8px; letter-spacing: 0.1em; opacity: 0.65; }
+.rot-dot-lbl { font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 8.5px; fill: var(--text-secondary); }
 
 .rot-board { display: flex; flex-direction: column; }
 .rot-board-head { display: grid; grid-template-columns: 1fr auto 56px; gap: 8px; padding: 2px 4px 4px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); border-bottom: 1px solid var(--border-subtle); }
@@ -17694,7 +17679,7 @@ body.layout-free .panels-grid::after {
 .rot-foot { font-size: 9.5px; color: var(--text-ghost); letter-spacing: 0.03em; padding-top: 2px; }
 
 /* ── Lux Book (fund top-10 allocation) ────────────────────────────────────── */
-.book { display: flex; flex-direction: column; font-family: var(--font-mono); padding: 2px; }
+.book { display: flex; flex-direction: column; font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; padding: 2px; }
 .book-na { color: var(--text-dim); font-size: 12px; padding: 12px 6px; text-align: center; }
 .book-head, .book-row {
   display: grid; grid-template-columns: 18px 1fr 108px 62px 44px 48px; gap: 8px; align-items: center;
@@ -17717,12 +17702,12 @@ body.layout-free .panels-grid::after {
 .book-mom.up, .book-ret.up { color: var(--green); }
 .book-mom.down, .book-ret.down { color: var(--red); }
 .book-mom.flat, .book-ret.flat { color: var(--text-dim); }
-.book-note { font-family: var(--font-body); font-size: 11.5px; line-height: 1.5; color: var(--text-dim); padding: 10px 4px 4px; border-top: 1px solid var(--border-subtle); margin-top: 4px; }
+.book-note { font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 11.5px; line-height: 1.5; color: var(--text-dim); padding: 10px 4px 4px; border-top: 1px solid var(--border-subtle); margin-top: 4px; }
 .book-foot { font-size: 9.5px; color: var(--text-ghost); padding: 4px; letter-spacing: 0.03em; }
 
 /* ── Lux Fund white-label wordmark ────────────────────────────────────────── */
 .header-logo-lux { display: inline-flex; align-items: center; text-decoration: none; }
-.lux-wordmark { display: inline-flex; align-items: baseline; gap: 6px; font-family: var(--font-body); font-weight: 700; font-size: 15px; letter-spacing: 0.14em; color: var(--text); }
+.lux-wordmark { display: inline-flex; align-items: baseline; gap: 6px; font-family: Zen, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-weight: 700; font-size: 15px; letter-spacing: 0.14em; color: var(--text); }
 .lux-wordmark-sub { font-weight: 500; font-size: 10px; letter-spacing: 0.28em; color: var(--text-dim); }
 
 /* Lux Fund is a focused, academic terminal — no multi-view switcher, no emoji. */
@@ -17759,7 +17744,7 @@ body.layout-free .panels-grid::after {
 
 .tb-class-label {
   fill: var(--text-dim);
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   letter-spacing: 0.14em;
   text-anchor: middle;
@@ -17781,7 +17766,7 @@ body.layout-free .panels-grid::after {
 
 .tb-leaf-ticker {
   fill: #0b0b0b;
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-weight: 700;
   text-anchor: middle;
   pointer-events: none;
@@ -17790,7 +17775,7 @@ body.layout-free .panels-grid::after {
 
 .tb-leaf-pct {
   fill: rgba(0, 0, 0, 0.72);
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 8.5px;
   text-anchor: middle;
   pointer-events: none;
@@ -17807,7 +17792,7 @@ body.layout-free .panels-grid::after {
   border: 1px solid var(--border-strong);
   border-radius: 4px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
-  font-family: var(--font-mono);
+  font-family: Zen Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.1s ease;

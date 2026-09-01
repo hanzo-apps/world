@@ -4634,7 +4634,6 @@ export class DeckGLMap {
     });
   }
 
-  // Inter-region traffic: thin monochrome white arcs, opacity scaled by weight
   // (no rainbow). A travelling white pulse (AnimatedArcLayer, coef advanced by
   // the cloud-pulse RAF) shows flow direction source→target. Works on the globe
   // as-is (uv.x is the along-arc ratio in both projections).

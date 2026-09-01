@@ -1,6 +1,5 @@
 // Shared formatting + tiny SVG helpers for the SaaS/cloud panels. One place for
 // number formatting, stat tiles and sparklines so every cloud panel reads as one
-// system (Geist Mono numerics, black monochrome — styled in main.css).
 import { escapeHtml } from './sanitize';
 
 /** Compact number: 1_234_567 → "1.23M", 3_400 → "3.4k". */
