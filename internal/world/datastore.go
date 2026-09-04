@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/hanzoai/bucket"
 	"github.com/hanzoai/world/internal/world/kv"
 	"github.com/hanzoai/world/internal/world/model"
 	"github.com/hanzoai/world/internal/world/store"
@@ -12,29 +13,29 @@ import (
 
 // datastore.go wires world's three storage concerns onto the Server and owns
 // their lifecycle, keeping each in its lane:
-//   - hanzo-kv (shared hot cache)  → instant feed bodies (FeedCache L2)
+//   - cloud KV (shared hot cache)  → instant feed bodies (FeedCache L2)
 //   - embedded SQLite (lake)       → the searchable "one place to query everything"
 //   - embedded SQLite (settings)   → signed-in per-identity dashboard sync
 //
-// Everything degrades cleanly: no hanzo-kv → per-pod in-mem feed cache; no
+// Everything degrades cleanly: no cloud KV → per-pod in-mem feed cache; no
 // SQLite → search/analytics return empty and settings say "not stored". The
 // service never 5xxes over storage.
 
-// kvAddr is the hanzo-kv endpoint. Defaults to the in-cluster Service; set empty
-// (WORLD_KV_DISABLE=1) to force the pure in-mem path (local dev / CI).
-func kvAddr() string {
+// kvBaseURL is the shared KV's API base. Defaults to the public gateway; set
+// empty (WORLD_KV_DISABLE=1) to force the pure in-mem path (local dev / CI).
+func kvBaseURL() string {
 	if env("WORLD_KV_DISABLE") != "" {
 		return ""
 	}
-	if a := env("HANZO_KV_ADDR", "WORLD_KV_ADDR"); a != "" {
-		return a
+	if u := env("HANZO_API_BASE", "WORLD_KV_BASE_URL"); u != "" {
+		return u
 	}
-	return "hanzo-kv:6379"
+	return bucket.DefaultBaseURL
 }
 
-// kvPassword is optional — hanzo-kv currently requires none; the hook is here for
-// a future KMS-provisioned password (HANZO_KV_PASSWORD / world-secrets).
-func kvPassword() string { return env("HANZO_KV_PASSWORD", "WORLD_KV_PASSWORD") }
+// kvToken is world's own Hanzo IAM bearer token for the shared KV, sourced
+// from a KMS-backed secret. Never hard-code it.
+func kvToken() string { return env("HANZO_API_TOKEN", "WORLD_KV_TOKEN") }
 
 // lakeRetention is the rolling window ingested items are kept for.
 func lakeRetention() time.Duration {
@@ -46,10 +47,11 @@ func lakeRetention() time.Duration {
 	return store.DefaultRetention
 }
 
-// initDatastore opens hanzo-kv + the embedded SQLite datastore and builds the
-// two-tier feed cache. Called once from NewServer; never fails hard.
+// initDatastore opens the shared KV + the embedded SQLite datastore and
+// builds the two-tier feed cache. Called once from NewServer; never fails
+// hard.
 func (s *Server) initDatastore() {
-	s.kv = kv.Open(kvAddr(), kvPassword())
+	s.kv = kv.Open(kvBaseURL(), kvToken())
 
 	db, err := store.Open(modelDataDir(), lakeRetention())
 	if err != nil {
@@ -70,9 +72,9 @@ func (s *Server) StartDatastore(ctx context.Context) {
 	if s.kv.Enabled() {
 		pctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 		if err := s.kv.Ping(pctx); err != nil {
-			logf("world-kv: %s unreachable, using per-pod in-mem cache: %v", kvAddr(), err)
+			logf("world-kv: %s unreachable, using per-pod in-mem cache: %v", kvBaseURL(), err)
 		} else {
-			logf("world-kv: connected to %s (shared feed cache)", kvAddr())
+			logf("world-kv: connected to %s (shared feed cache)", kvBaseURL())
 		}
 		cancel()
 	} else {

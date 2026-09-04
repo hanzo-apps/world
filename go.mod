@@ -3,9 +3,7 @@ module github.com/hanzoai/world
 go 1.26.4
 
 require (
-	github.com/alicebob/miniredis/v2 v2.38.0
 	github.com/hanzoai/sqlite v0.3.2
-	github.com/hanzokv/go/v9 v9.22.0
 	golang.org/x/net v0.54.0
 )
 
@@ -15,6 +13,7 @@ require (
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/hanzoai/bucket v0.1.1
 	github.com/hanzoai/csqlite v0.1.0 // indirect
 	github.com/hanzoai/sqlcipher v0.1.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
@@ -29,3 +28,8 @@ require (
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 )
+
+// hanzoai/bucket v0.1.1 is tagged and pushed to github.com/hanzoai/bucket;
+// pinned to the local checkout until the forge mirror that this module path
+// resolves through (git.hanzo.ai) is reachable again.
+replace github.com/hanzoai/bucket => ../bucket

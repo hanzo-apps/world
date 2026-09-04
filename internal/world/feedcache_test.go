@@ -2,12 +2,60 @@ package world
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/alicebob/miniredis/v2"
 	"github.com/hanzoai/world/internal/world/kv"
 )
+
+// fakeKVServer is a minimal in-memory stand-in for cloud's /v1/kv REST
+// surface: enough of POST/PUT/GET to prove the shared-cache behavior below
+// without a live cluster.
+func fakeKVServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	var mu sync.Mutex
+	buckets := map[string]bool{}
+	values := map[string]string{} // "bucket/key" -> value
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/v1/kv/"), "/")
+		switch {
+		case len(parts) == 1 && r.Method == http.MethodPost:
+			if buckets[parts[0]] {
+				w.WriteHeader(http.StatusConflict)
+				return
+			}
+			buckets[parts[0]] = true
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]any{"bucket": parts[0]})
+		case len(parts) == 2 && r.Method == http.MethodPut:
+			var in struct {
+				Value string `json:"value"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&in)
+			values[parts[0]+"/"+parts[1]] = in.Value
+			_ = json.NewEncoder(w).Encode(map[string]uint64{"revision": 1})
+		case len(parts) == 2 && r.Method == http.MethodGet:
+			v, ok := values[parts[0]+"/"+parts[1]]
+			if !ok {
+				w.WriteHeader(http.StatusNotFound)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"key": parts[1], "value": v, "revision": 1, "operation": "put"})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
 
 func TestFeedEncodeDecodeRoundTrip(t *testing.T) {
 	at := time.Now().Truncate(time.Nanosecond)
@@ -31,9 +79,9 @@ func TestFeedEncodeDecodeRoundTrip(t *testing.T) {
 // one pod is served to another pod whose L1 is cold — i.e. warming once benefits
 // the fleet, and a restarted pod (empty L1) reads a still-warm shared cache.
 func TestFeedCacheSharedAcrossPods(t *testing.T) {
-	mr := miniredis.RunT(t)
-	kvA := kv.Open(mr.Addr(), "")
-	kvB := kv.Open(mr.Addr(), "")
+	srv := fakeKVServer(t)
+	kvA := kv.Open(srv.URL, "test-token")
+	kvB := kv.Open(srv.URL, "test-token")
 	t.Cleanup(func() { kvA.Close(); kvB.Close() })
 
 	podA := NewFeedCache(kvA, 0, nil)
@@ -66,8 +114,8 @@ func TestFeedCacheSharedAcrossPods(t *testing.T) {
 // re-fetched by every pod every cycle, forever — including after the topic is
 // deleted. Demand nobody renews within warmTTL is dropped from both tiers.
 func TestWarmSetForgetsUnrequestedFeeds(t *testing.T) {
-	mr := miniredis.RunT(t)
-	kvc := kv.Open(mr.Addr(), "")
+	srv := fakeKVServer(t)
+	kvc := kv.Open(srv.URL, "test-token")
 	t.Cleanup(kvc.Close)
 	c := NewFeedCache(kvc, 0, []string{"https://seed.example/rss"})
 
@@ -100,7 +148,7 @@ func TestWarmSetForgetsUnrequestedFeeds(t *testing.T) {
 		t.Fatalf("in-mem demand tier kept %d expired entries", n)
 	}
 	// And the fleet-wide registry itself shrank — not just this pod's view of it.
-	if members, _ := mr.ZMembers(warmSetKey); len(members) != 0 {
+	if members := kvc.ZSince(context.Background(), warmSetKey, time.Time{}); len(members) != 0 {
 		t.Fatalf("shared registry still holds %v", members)
 	}
 }
