@@ -3,7 +3,7 @@
  * AIS WebSocket Relay Server
  * Proxies aisstream.io data to browsers via WebSocket
  *
- * Deploy on Railway with:
+ * Deploy with:
  *   AISSTREAM_API_KEY=your_key
  *
  * Local: node scripts/ais-relay.cjs
@@ -354,11 +354,11 @@ setInterval(() => {
   }
 }, SNAPSHOT_INTERVAL_MS);
 
-// UCDP GED Events cache (persistent in-memory — Railway advantage)
+// UCDP GED Events cache (persistent in-memory — long-lived process advantage)
 const UCDP_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const UCDP_PAGE_SIZE = 1000;
 const UCDP_MAX_PAGES = 12;
-const UCDP_FETCH_TIMEOUT = 30000; // 30s per page (no Railway limit)
+const UCDP_FETCH_TIMEOUT = 30000; // 30s per page (no platform timeout limit)
 const UCDP_TRAILING_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 
 let ucdpCache = { data: null, timestamp: 0 };
@@ -917,7 +917,7 @@ function handlePolymarketRequest(req, res) {
       'Content-Type': 'application/json',
       'Cache-Control': 'public, max-age=120',
       'X-Cache': 'HIT',
-      'X-Polymarket-Source': 'railway-cache',
+      'X-Polymarket-Source': 'relay-cache',
     }, cached.data);
   }
 
@@ -952,7 +952,7 @@ function handlePolymarketRequest(req, res) {
         'Content-Type': 'application/json',
         'Cache-Control': 'public, max-age=120',
         'X-Cache': 'MISS',
-        'X-Polymarket-Source': 'railway',
+        'X-Polymarket-Source': 'relay',
       }, data);
     });
   });
@@ -962,7 +962,7 @@ function handlePolymarketRequest(req, res) {
       return sendCompressed(req, res, 200, {
         'Content-Type': 'application/json',
         'X-Cache': 'STALE',
-        'X-Polymarket-Source': 'railway-stale',
+        'X-Polymarket-Source': 'relay-stale',
       }, cached.data);
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -974,7 +974,7 @@ function handlePolymarketRequest(req, res) {
       return sendCompressed(req, res, 200, {
         'Content-Type': 'application/json',
         'X-Cache': 'STALE',
-        'X-Polymarket-Source': 'railway-stale',
+        'X-Polymarket-Source': 'relay-stale',
       }, cached.data);
     }
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1075,7 +1075,7 @@ const server = http.createServer(async (req, res) => {
         return res.end(JSON.stringify({ error: 'Missing url parameter' }));
       }
 
-      // Allow domains that block Vercel IPs (must match feeds.ts railwayRss usage)
+      // Allow domains that block Vercel IPs (must match feeds.ts relayRss usage)
       const allowedDomains = [
         // Original
         'rss.cnn.com',
@@ -1102,7 +1102,7 @@ const server = http.createServer(async (req, res) => {
       const parsed = new URL(feedUrl);
       if (!allowedDomains.includes(parsed.hostname)) {
         res.writeHead(403, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ error: 'Domain not allowed on Railway proxy' }));
+        return res.end(JSON.stringify({ error: 'Domain not allowed on relay proxy' }));
       }
 
       // Serve from cache if fresh (5 min TTL)

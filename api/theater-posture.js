@@ -224,7 +224,7 @@ function isMilitaryCallsign(callsign) {
 async function fetchMilitaryFlights() {
   const isSidecar = (process.env.LOCAL_API_MODE || '').includes('sidecar');
   // Desktop sidecar: fetch directly from OpenSky (single user, no rate limit concern)
-  // Cloud: use Railway relay to avoid OpenSky rate limits across many users
+  // Cloud: use relay to avoid OpenSky rate limits across many users
   const baseUrl = isSidecar
     ? 'https://opensky-network.org/api/states/all'
     : (process.env.WS_RELAY_URL ? process.env.WS_RELAY_URL + '/opensky' : null);

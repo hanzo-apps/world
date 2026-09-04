@@ -1556,13 +1556,13 @@ AISStream → WebSocket Relay → Browser
 
 The connection automatically reconnects on disconnection with a 30-second backoff. When the Ships layer is disabled, the WebSocket disconnects to conserve resources.
 
-### Railway Relay Architecture
+### Relay Architecture
 
-Some APIs block requests from cloud providers (Vercel, AWS, Cloudflare Workers). A Railway relay server provides authenticated access:
+Some APIs block requests from cloud providers (Vercel, AWS, Cloudflare Workers). A relay server provides authenticated access:
 
 ```
-Browser → Railway Relay → External APIs
-           (Node.js)      (AIS, OpenSky, RSS)
+Browser → Relay → External APIs
+        (Node.js) (AIS, OpenSky, RSS)
 ```
 
 **Relay Functions**:
@@ -1574,18 +1574,18 @@ Browser → Railway Relay → External APIs
 | `/rss` | Blocked RSS feeds | None (user-agent spoofing) |
 | `/health` | Status check | None |
 
-**Environment Variables** (Railway):
+**Environment Variables**:
 
 - `AISSTREAM_API_KEY` - AIS data access
 - `OPENSKY_CLIENT_ID` - OAuth2 client ID
 - `OPENSKY_CLIENT_SECRET` - OAuth2 client secret
 
-**Why Railway?**
+**Why a separate relay?**
 
 - Residential IP ranges (not blocked like cloud providers)
 - WebSocket support for persistent connections
 - Global edge deployment for low latency
-- Free tier sufficient for moderate traffic
+- Runs affordably at moderate traffic
 
 The relay is stateless—it simply authenticates and proxies requests. All caching and processing happens client-side or in Vercel Edge Functions.
 
@@ -1658,7 +1658,7 @@ Vessels within 50km of these bases are flagged, enabling detection of unusual ac
 
 ### Aircraft Tracking (OpenSky)
 
-Military aircraft are tracked via the OpenSky Network using ADS-B data. OpenSky blocks unauthenticated requests from cloud provider IPs (Vercel, Railway, AWS), so aircraft tracking requires a relay server with credentials.
+Military aircraft are tracked via the OpenSky Network using ADS-B data. OpenSky blocks unauthenticated requests from cloud provider IPs (Vercel, AWS, and others), so aircraft tracking requires a relay server with credentials.
 
 **Authentication**:
 
@@ -3209,7 +3209,7 @@ Different data sources update at different frequencies based on volatility and A
 
 AIS vessel tracking uses WebSocket for true real-time:
 
-- **Connection**: Persistent WebSocket to Railway relay
+- **Connection**: Persistent WebSocket to relay
 - **Messages**: Position updates as vessels transmit
 - **Reconnection**: Automatic with exponential backoff (5s → 10s → 20s)
 
@@ -3630,7 +3630,7 @@ Terrestrial receivers only detect vessels within ~50km of shore. Satellite AIS (
 
 ### Blocked Data Sources
 
-Some publishers block requests from cloud providers (Vercel, Railway, AWS):
+Some publishers block requests from cloud providers (Vercel, AWS, and others):
 
 - RSS feeds from certain outlets may fail with 403 errors
 - This is a common anti-bot measure, not a bug in the dashboard

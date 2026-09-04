@@ -27,9 +27,9 @@ interface PolymarketEvent {
 
 const GAMMA_API = 'https://gamma-api.polymarket.com';
 
-// Railway relay URL for Polymarket proxy (Cloudflare JA3 blocks Vercel)
+// Relay URL for Polymarket proxy (Cloudflare JA3 blocks Vercel)
 const wsRelayUrl = import.meta.env.VITE_WS_RELAY_URL || '';
-const RAILWAY_POLY_URL = wsRelayUrl
+const RELAY_POLY_URL = wsRelayUrl
   ? wsRelayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '') + '/polymarket'
   : '';
 
@@ -115,15 +115,15 @@ async function polyFetch(endpoint: 'events' | 'markets', params: Record<string, 
   }
   const proxyQs = new URLSearchParams(proxyParams).toString();
 
-  // Try Railway relay (different IP/TLS fingerprint than Vercel)
-  if (RAILWAY_POLY_URL) {
+  // Try relay (different IP/TLS fingerprint than Vercel)
+  if (RELAY_POLY_URL) {
     try {
-      const resp = await fetch(`${RAILWAY_POLY_URL}?${proxyQs}`);
+      const resp = await fetch(`${RELAY_POLY_URL}?${proxyQs}`);
       if (resp.ok) {
         const data = await resp.clone().json();
         if (Array.isArray(data) && data.length > 0) return resp;
       }
-    } catch { /* Railway unavailable */ }
+    } catch { /* relay unavailable */ }
   }
 
   // Try Vercel edge function

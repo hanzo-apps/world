@@ -677,7 +677,7 @@ A single codebase produces three specialized dashboards, each with distinct feed
 | **Cache everything, trust nothing** | Three-tier caching (in-memory → Redis → upstream) with versioned cache keys and stale-on-error fallback. Every API response includes `X-Cache` header for debugging. CDN layer (`s-maxage`) absorbs repeated requests before they reach edge functions. |
 | **Bandwidth efficiency** | Gzip compression on all relay responses (80% reduction). Content-hash static assets with 1-year immutable cache. Staggered polling intervals prevent synchronized API storms. Animations and polling pause on hidden tabs. |
 | **Baseline-aware alerting** | Trending keyword detection uses rolling 2-hour windows against 7-day baselines with per-term spike multipliers, cooldowns, and source diversity requirements — surfacing genuine surges while suppressing noise. |
-| **Run anywhere** | Same codebase produces three specialized variants (geopolitical, tech, finance) and deploys to Vercel (web), Railway (relay), Tauri (desktop), and PWA (installable). Desktop sidecar mirrors all cloud API handlers locally. Service worker caches map tiles for offline use while keeping intelligence data always-fresh (NetworkOnly). |
+| **Run anywhere** | Same codebase produces three specialized variants (geopolitical, tech, finance) and deploys to Vercel (web), a relay service (WebSocket + IP-diverse proxying), Tauri (desktop), and PWA (installable). Desktop sidecar mirrors all cloud API handlers locally. Service worker caches map tiles for offline use while keeping intelligence data always-fresh (NetworkOnly). |
 
 ---
 
@@ -700,7 +700,7 @@ Feeds also carry a **propaganda risk rating** and **state affiliation flag**. St
 
 Hanzo World uses 60+ Vercel Edge Functions as a lightweight API layer. Each edge function handles a single data source concern — proxying, caching, or transforming external APIs. This architecture avoids a monolithic backend while keeping API keys server-side:
 
-- **RSS Proxy** — domain-allowlisted proxy for 100+ feeds, preventing CORS issues and hiding origin servers. Feeds from domains that block Vercel IPs are automatically routed through the Railway relay.
+- **RSS Proxy** — domain-allowlisted proxy for 100+ feeds, preventing CORS issues and hiding origin servers. Feeds from domains that block Vercel IPs are automatically routed through the relay service.
 - **AI Pipeline** — Groq and OpenRouter edge functions with Redis deduplication, so identical headlines across concurrent users only trigger one LLM call. The classify-event endpoint pauses its queue on 500 errors to avoid wasting API quota.
 - **Data Adapters** — GDELT, ACLED, OpenSky, USGS, NASA FIRMS, FRED, Yahoo Finance, CoinGecko, mempool.space, and others each have dedicated edge functions that normalize responses into consistent schemas
 - **Market Intelligence** — macro signals, ETF flows, and stablecoin monitors compute derived analytics server-side (VWAP, SMA, peg deviation, flow estimates) and cache results in Redis
@@ -737,22 +737,22 @@ All three variants run on three platforms that work together:
            │ wss://   (client-side)
            ▼
 ┌─────────────────────────────────────┐
-│       Railway (Relay Server)        │
+│            Relay Server             │
 │  WebSocket relay · OpenSky OAuth2   │
 │  RSS proxy for blocked domains      │
 │  AIS vessel stream · gzip all resp  │
 └─────────────────────────────────────┘
 ```
 
-**Why two platforms?** Several upstream APIs (OpenSky Network, CNN RSS, UN News, CISA, IAEA) actively block requests from Vercel's IP ranges. The Railway relay server acts as an alternate origin, handling:
+**Why two platforms?** Several upstream APIs (OpenSky Network, CNN RSS, UN News, CISA, IAEA) actively block requests from Vercel's IP ranges. A separate relay server acts as an alternate origin, handling:
 
 - **AIS vessel tracking** — maintains a persistent WebSocket connection to AISStream.io and multiplexes it to all connected browser clients, avoiding per-user connection limits
 - **OpenSky aircraft data** — authenticates via OAuth2 client credentials flow (Vercel IPs get 403'd by OpenSky without auth tokens)
 - **RSS feeds** — proxies feeds from domains that block Vercel IPs, with a separate domain allowlist for security
 
-The Vercel edge functions connect to Railway via `WS_RELAY_URL` (server-side, HTTPS) while browser clients connect via `VITE_WS_RELAY_URL` (client-side, WSS). This separation keeps the relay URL configurable per deployment without leaking server-side configuration to the browser.
+The Vercel edge functions connect to the relay via `WS_RELAY_URL` (server-side, HTTPS) while browser clients connect via `VITE_WS_RELAY_URL` (client-side, WSS). This separation keeps the relay URL configurable per deployment without leaking server-side configuration to the browser.
 
-All Railway relay responses are gzip-compressed (zlib `gzipSync`) when the client accepts it and the payload exceeds 1KB, reducing egress by ~80% for JSON and XML responses.
+All relay responses are gzip-compressed (zlib `gzipSync`) when the client accepts it and the payload exceeds 1KB, reducing egress by ~80% for JSON and XML responses.
 
 ---
 
@@ -831,7 +831,7 @@ Every API edge function includes `Cache-Control` headers that enable Vercel's CD
 
 Static assets use content-hash filenames with 1-year immutable cache headers. The service worker file (`sw.js`) is never cached (`max-age=0, must-revalidate`) to ensure update detection.
 
-### Railway Relay Compression
+### Relay Compression
 
 All relay server responses pass through `gzipSync` when the client accepts gzip and the payload exceeds 1KB. This applies to OpenSky aircraft JSON, RSS XML feeds, UCDP event data, AIS snapshots, and health checks — reducing wire size by approximately 80%.
 
@@ -878,7 +878,7 @@ The AI summarization pipeline adds content-based deduplication: headlines are ha
 |-------|-----------|
 | **CORS origin allowlist** | Only `world.hanzo.ai`, `world.hanzo.ai`, `world.hanzo.ai`, and `localhost:*` can call API endpoints. All others receive 403. Implemented in `api/_cors.js`. |
 | **RSS domain allowlist** | The RSS proxy only fetches from explicitly listed domains (~90+). Requests for unlisted domains are rejected with 403. |
-| **Railway domain allowlist** | The Railway relay has a separate, smaller domain allowlist for feeds that need the alternate origin. |
+| **Relay domain allowlist** | The relay has a separate, smaller domain allowlist for feeds that need the alternate origin. |
 | **API key isolation** | All API keys live server-side in Vercel environment variables. The browser never sees Groq, OpenRouter, ACLED, Finnhub, or other credentials. |
 | **Input sanitization** | User-facing content passes through `escapeHtml()` (prevents XSS) and `sanitizeUrl()` (blocks `javascript:` and `data:` URIs). URLs use `escapeAttr()` for attribute context encoding. |
 | **Query parameter validation** | API endpoints validate input formats (e.g., stablecoin coin IDs must match `[a-z0-9-]+`, bounding box params are numeric). |
@@ -911,7 +911,7 @@ The dashboard works without any API keys — panels for unconfigured services si
 cp .env.example .env.local
 ```
 
-The `.env.example` file documents every variable with descriptions and registration links, organized by deployment target (Vercel vs Railway). Key groups:
+The `.env.example` file documents every variable with descriptions and registration links, organized by deployment target (Vercel vs relay). Key groups:
 
 | Group | Variables | Free Tier |
 |-------|-----------|-----------|
@@ -974,12 +974,11 @@ This runs the frontend without the API layer. Panels that require server-side pr
 | **Raspberry Pi / ARM** | Partial | `vercel dev` edge runtime emulation may not work on ARM. Use Option 1 (deploy to Vercel) or Option 3 (static frontend) instead |
 | **Docker** | Planned | See [Roadmap](#roadmap) |
 
-### Railway Relay (Optional)
+### Relay Server (Optional)
 
-For live AIS vessel tracking and OpenSky aircraft data, deploy the WebSocket relay on Railway:
+For live AIS vessel tracking and OpenSky aircraft data, deploy the WebSocket relay:
 
 ```bash
-# On Railway, deploy with:
 node scripts/ais-relay.cjs
 ```
 
@@ -999,7 +998,7 @@ Set `WS_RELAY_URL` (server-side, HTTPS) and `VITE_WS_RELAY_URL` (client-side, WS
 | **Market APIs** | Yahoo Finance (equities, forex, crypto), CoinGecko (stablecoins), mempool.space (BTC hashrate), alternative.me (Fear & Greed) |
 | **Threat Intel APIs** | abuse.ch (Feodo Tracker, URLhaus), AlienVault OTX, AbuseIPDB, C2IntelFeeds |
 | **Economic APIs** | FRED (Federal Reserve), EIA (Energy), Finnhub (stock quotes) |
-| **Deployment** | Vercel Edge Functions (60+ endpoints) + Railway (WebSocket relay) + Tauri (desktop) + PWA (installable) |
+| **Deployment** | Vercel Edge Functions (60+ endpoints) + a relay server (WebSocket) + Tauri (desktop) + PWA (installable) |
 | **Finance Data** | 92 stock exchanges, 19 financial centers, 13 central banks, 10 commodity hubs, 64 Gulf FDI investments |
 | **Data** | 150+ RSS feeds, ADS-B transponders, AIS maritime data, VIIRS satellite imagery, 8 live YouTube streams |
 
@@ -1052,7 +1051,7 @@ Desktop release details, signing hooks, variant outputs, and clean-machine valid
 - [x] 60+ API edge functions for programmatic access
 - [x] Tri-variant system (geopolitical + tech + finance)
 - [x] Market intelligence (macro signals, ETF flows, stablecoin peg monitoring)
-- [x] Railway relay for WebSocket and blocked-domain proxying
+- [x] Relay server for WebSocket and blocked-domain proxying
 - [x] CORS origin allowlist and security hardening
 - [x] Native desktop application (Tauri) with OS keychain + authenticated sidecar
 - [x] Progressive Web App with offline map support and installability

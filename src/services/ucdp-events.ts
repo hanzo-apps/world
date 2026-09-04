@@ -9,7 +9,7 @@ interface UcdpEventsResponse {
 }
 
 const wsRelayUrl = import.meta.env.VITE_WS_RELAY_URL || '';
-const RAILWAY_URL = wsRelayUrl
+const RELAY_URL = wsRelayUrl
   ? wsRelayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '') + '/ucdp-events'
   : '';
 const VERCEL_URL = '/v1/world/ucdp-events';
@@ -28,11 +28,11 @@ async function fetchFromUrl(url: string): Promise<UcdpEventsResponse> {
 
 export async function fetchUcdpEvents(): Promise<UcdpEventsResponse> {
   return breaker.execute(async () => {
-    if (RAILWAY_URL) {
+    if (RELAY_URL) {
       try {
-        return await fetchFromUrl(RAILWAY_URL);
+        return await fetchFromUrl(RELAY_URL);
       } catch {
-        // Railway unavailable or route not deployed yet — fall back to Vercel
+        // Relay unavailable or route not deployed yet — fall back to Vercel
       }
     }
     return fetchFromUrl(VERCEL_URL);

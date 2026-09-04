@@ -4,14 +4,14 @@ import { SITE_VARIANT } from './variant';
 // Helper to create RSS proxy URL (Vercel)
 const rss = (url: string) => `/v1/world/rss-proxy?url=${encodeURIComponent(url)}`;
 
-// Railway proxy for feeds blocked by Vercel IPs (UN News, CISA, etc.)
+// Relay proxy for feeds blocked by Vercel IPs (UN News, CISA, etc.)
 // Reuses VITE_WS_RELAY_URL which is already configured for AIS/OpenSky
 const wsRelayUrl = import.meta.env.VITE_WS_RELAY_URL || '';
-const railwayBaseUrl = wsRelayUrl
+const relayBaseUrl = wsRelayUrl
   ? wsRelayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '')
   : '';
-const railwayRss = (url: string) =>
-  railwayBaseUrl ? `${railwayBaseUrl}/rss?url=${encodeURIComponent(url)}` : rss(url);
+const relayRss = (url: string) =>
+  relayBaseUrl ? `${relayBaseUrl}/rss?url=${encodeURIComponent(url)}` : rss(url);
 
 // Social platforms. Reddit and YouTube publish real RSS/Atom, so they ride the
 // same rss() proxy as every other feed. X, TikTok and LinkedIn expose posts only
@@ -509,8 +509,8 @@ const FULL_FEEDS: Record<string, Feed[]> = {
     { name: 'CDC', url: rss('https://news.google.com/rss/search?q=site:cdc.gov+OR+CDC+health&hl=en-US&gl=US&ceid=US:en') },
     { name: 'FEMA', url: rss('https://news.google.com/rss/search?q=site:fema.gov+OR+FEMA+emergency&hl=en-US&gl=US&ceid=US:en') },
     { name: 'DHS', url: rss('https://news.google.com/rss/search?q=site:dhs.gov+OR+"Homeland+Security"&hl=en-US&gl=US&ceid=US:en') },
-    { name: 'UN News', url: railwayRss('https://news.un.org/feed/subscribe/en/news/all/rss.xml') },
-    { name: 'CISA', url: railwayRss('https://www.cisa.gov/cybersecurity-advisories/all.xml') },
+    { name: 'UN News', url: relayRss('https://news.un.org/feed/subscribe/en/news/all/rss.xml') },
+    { name: 'CISA', url: relayRss('https://www.cisa.gov/cybersecurity-advisories/all.xml') },
   ],
   layoffs: [
     { name: 'Layoffs.fyi', url: rss('https://layoffs.fyi/feed/') },
@@ -519,7 +519,7 @@ const FULL_FEEDS: Record<string, Feed[]> = {
   ],
   thinktanks: [
     { name: 'Foreign Policy', url: rss('https://foreignpolicy.com/feed/') },
-    { name: 'Atlantic Council', url: railwayRss('https://www.atlanticcouncil.org/feed/') },
+    { name: 'Atlantic Council', url: relayRss('https://www.atlanticcouncil.org/feed/') },
     { name: 'Foreign Affairs', url: rss('https://www.foreignaffairs.com/rss.xml') },
     { name: 'CSIS', url: rss('https://news.google.com/rss/search?q=site:csis.org+when:7d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'RAND', url: rss('https://news.google.com/rss/search?q=site:rand.org+when:7d&hl=en-US&gl=US&ceid=US:en') },
@@ -554,7 +554,7 @@ const FULL_FEEDS: Record<string, Feed[]> = {
   africa: [
     { name: 'Africa News', url: rss('https://news.google.com/rss/search?q=(Africa+OR+Nigeria+OR+Kenya+OR+"South+Africa"+OR+Ethiopia)+when:2d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Sahel Crisis', url: rss('https://news.google.com/rss/search?q=(Sahel+OR+Mali+OR+Niger+OR+"Burkina+Faso"+OR+Wagner)+when:3d&hl=en-US&gl=US&ceid=US:en') },
-    { name: 'News24', url: railwayRss('https://feeds.capi24.com/v1/Search/articles/news24/Africa/rss') },
+    { name: 'News24', url: relayRss('https://feeds.capi24.com/v1/Search/articles/news24/Africa/rss') },
     { name: 'BBC Africa', url: rss('https://feeds.bbci.co.uk/news/world/africa/rss.xml') },
     { name: 'Jeune Afrique', url: rss('https://www.jeuneafrique.com/feed/'), lang: 'fr' },
     { name: 'Africanews', url: { en: rss('https://www.africanews.com/feed/rss'), fr: rss('https://fr.africanews.com/feed/rss') } },
@@ -576,15 +576,15 @@ const FULL_FEEDS: Record<string, Feed[]> = {
   asia: [
     { name: 'Asia News', url: rss('https://news.google.com/rss/search?q=(China+OR+Japan+OR+Korea+OR+India+OR+ASEAN)+when:2d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'BBC Asia', url: rss('https://feeds.bbci.co.uk/news/world/asia/rss.xml') },
-    { name: 'South China Morning Post', url: railwayRss('https://www.scmp.com/rss/91/feed/') },
+    { name: 'South China Morning Post', url: relayRss('https://www.scmp.com/rss/91/feed/') },
     { name: 'Reuters Asia', url: rss('https://news.google.com/rss/search?q=site:reuters.com+(China+OR+Japan+OR+Taiwan+OR+Korea)+when:3d&hl=en-US&gl=US&ceid=US:en') },
-    { name: 'NHK World', url: railwayRss('https://rsshub.app/nhk/news/en') },
+    { name: 'NHK World', url: relayRss('https://rsshub.app/nhk/news/en') },
     { name: 'Nikkei Asia', url: rss('https://news.google.com/rss/search?q=site:asia.nikkei.com+when:3d&hl=en-US&gl=US&ceid=US:en') },
     { name: 'Asahi Shimbun', url: rss('https://www.asahi.com/rss/asahi/newsheadlines.rdf'), lang: 'ja' },
     { name: 'The Hindu', url: rss('https://www.thehindu.com/news/national/feeder/default.rss'), lang: 'en' },
     { name: 'CNA', url: rss('https://www.channelnewsasia.com/api/v1/rss-outbound-feed?_format=xml') },
-    { name: 'MIIT (China)', url: railwayRss('https://rsshub.app/gov/miit/zcjd'), lang: 'zh' },
-    { name: 'MOFCOM (China)', url: railwayRss('https://rsshub.app/gov/mofcom/article/xwfb'), lang: 'zh' },
+    { name: 'MIIT (China)', url: relayRss('https://rsshub.app/gov/miit/zcjd'), lang: 'zh' },
+    { name: 'MOFCOM (China)', url: relayRss('https://rsshub.app/gov/mofcom/article/xwfb'), lang: 'zh' },
   ],
   energy: [
     { name: 'Oil & Gas', url: rss('https://news.google.com/rss/search?q=(oil+price+OR+OPEC+OR+"natural+gas"+OR+pipeline+OR+LNG)+when:2d&hl=en-US&gl=US&ceid=US:en') },
@@ -999,7 +999,7 @@ export const INTEL_SOURCES: Feed[] = [
   { name: 'ECFR', url: rss('https://news.google.com/rss/search?q=site:ecfr.eu+when:7d&hl=en-US&gl=US&ceid=US:en'), type: 'intl' },
   { name: 'Foreign Policy', url: rss('https://foreignpolicy.com/feed/'), type: 'intl' },
   { name: 'Foreign Affairs', url: rss('https://www.foreignaffairs.com/rss.xml'), type: 'intl' },
-  { name: 'Atlantic Council', url: railwayRss('https://www.atlanticcouncil.org/feed/'), type: 'intl' },
+  { name: 'Atlantic Council', url: relayRss('https://www.atlanticcouncil.org/feed/'), type: 'intl' },
   { name: 'Middle East Institute', url: rss('https://news.google.com/rss/search?q=site:mei.edu+when:7d&hl=en-US&gl=US&ceid=US:en'), type: 'intl' },
 
   // Think Tanks & Research (Tier 3)

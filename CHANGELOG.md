@@ -259,12 +259,12 @@ All notable changes to World Monitor are documented here.
 ### Security
 
 - Migrate all Vercel edge functions to CORS allowlist
-- Restrict Railway relay CORS to allowed origins only
+- Restrict relay CORS to allowed origins only
 
 ### Fixed
 
 - Hide desktop config panel on web
-- Route World Bank & Polymarket via Railway relay
+- Route World Bank & Polymarket via relay
 
 ## [2.2.3] - 2026-02-12
 

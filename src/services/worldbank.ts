@@ -46,9 +46,9 @@ export interface IndicatorsResponse {
 
 const API_BASE = '/v1/world/worldbank';
 
-// Railway relay URL for World Bank proxy (World Bank blocks Vercel IPs)
+// Relay URL for World Bank proxy (World Bank blocks Vercel IPs)
 const wsRelayUrl = import.meta.env.VITE_WS_RELAY_URL || '';
-const RAILWAY_WB_URL = wsRelayUrl
+const RELAY_WB_URL = wsRelayUrl
   ? wsRelayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '') + '/worldbank'
   : '';
 
@@ -57,12 +57,12 @@ const dataCache = new Map<string, { data: WorldBankResponse; timestamp: number }
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
 async function wbFetch(qs: string): Promise<Response> {
-  // Try Railway first (World Bank blocks Vercel IPs with 403)
-  if (RAILWAY_WB_URL) {
+  // Try relay first (World Bank blocks Vercel IPs with 403)
+  if (RELAY_WB_URL) {
     try {
-      const resp = await fetch(`${RAILWAY_WB_URL}?${qs}`);
+      const resp = await fetch(`${RELAY_WB_URL}?${qs}`);
       if (resp.ok) return resp;
-    } catch { /* Railway unavailable, fall through */ }
+    } catch { /* relay unavailable, fall through */ }
   }
   // Fallback to Vercel edge function
   return fetch(`${API_BASE}?${qs}`);

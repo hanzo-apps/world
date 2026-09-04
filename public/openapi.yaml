@@ -2444,7 +2444,7 @@ paths:
             description: |-
                 TriggerSimulation enqueues a simulation task for the current
                  SIMULATION_PACKAGE_LATEST_KEY package pointer. PRO-gated. The runId
-                 is server-derived; callers cannot supply one. The Railway worker
+                 is server-derived; callers cannot supply one. The background worker
                  (scripts/process-simulation-tasks.mjs) polls the queue and writes
                  outcomes; callers poll GetSimulationOutcome with the returned runId
                  to retrieve the result. Mirrors run-scenario.ts pattern. See #3734.
@@ -7099,7 +7099,7 @@ paths:
             tags:
                 - TradeService
             summary: GetCustomsRevenue
-            description: Get US customs duties revenue (Treasury MTS data, seeded by Railway).
+            description: Get US customs duties revenue (Treasury MTS data).
             operationId: GetCustomsRevenue
             responses:
                 "200":

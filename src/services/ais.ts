@@ -3,7 +3,7 @@ import { dataFreshness } from './data-freshness';
 import { isFeatureAvailable } from './runtime-config';
 
 const wsRelayUrl = import.meta.env.VITE_WS_RELAY_URL || '';
-const RAILWAY_SNAPSHOT_URL = wsRelayUrl
+const RELAY_SNAPSHOT_URL = wsRelayUrl
   ? wsRelayUrl.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '') + '/ais/snapshot'
   : '';
 const VERCEL_SNAPSHOT_API = '/v1/world/ais-snapshot';
@@ -108,11 +108,11 @@ function parseSnapshot(data: unknown): {
 async function fetchSnapshotPayload(includeCandidates: boolean): Promise<unknown> {
   const query = `?candidates=${includeCandidates ? 'true' : 'false'}`;
 
-  if (RAILWAY_SNAPSHOT_URL) {
+  if (RELAY_SNAPSHOT_URL) {
     try {
-      const railway = await fetch(`${RAILWAY_SNAPSHOT_URL}${query}`, { headers: { Accept: 'application/json' } });
-      if (railway.ok) return railway.json();
-    } catch { /* Railway unavailable — fall through */ }
+      const relay = await fetch(`${RELAY_SNAPSHOT_URL}${query}`, { headers: { Accept: 'application/json' } });
+      if (relay.ok) return relay.json();
+    } catch { /* relay unavailable — fall through */ }
   }
 
   const primary = await fetch(`${VERCEL_SNAPSHOT_API}${query}`, { headers: { Accept: 'application/json' } });
