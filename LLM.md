@@ -83,3 +83,7 @@ Bump `package.json` PATCH (x.y.z → x.y.z+1, never a lazy major), tag `v<versio
 `v`. CI's "Deploy" step can false-negative while the operator finishes rolling —
 verify the live version, not just the CI square. Test/doc-only changes need no
 release (the image is byte-identical).
+
+## Image
+
+`FROM scratch`: the static binary, the CA bundle, zoneinfo, the built sites at `/srv` and `/srv-react`, and a world-writable `/tmp` (the embedded store's fallback when no `/data` volume is mounted), running as 10001. Nothing else is present to run.

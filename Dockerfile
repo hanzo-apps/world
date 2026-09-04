@@ -97,12 +97,21 @@ COPY internal ./internal
 RUN CGO_ENABLED=0 GOOS=linux go build -tags sqlite_fts5 -trimpath -ldflags="-s -w" -o /out/world ./cmd/world
 
 # ---- final stage: minimal image running the Go binary --------------------
-FROM alpine:3.20
+
+# An empty image: the static binary, the site it serves, and a writable /tmp.
+# The embedded store falls back to /tmp/hanzo-world when no /data volume is
+# mounted; without a /tmp it opens degraded and settings stop persisting.
+FROM alpine:3.22 AS root
 RUN apk add --no-cache ca-certificates tzdata \
-  && adduser -D -H -u 10001 world
+  && mkdir -m 1777 -p /rootfs/tmp
+
+FROM scratch
+COPY --from=root /rootfs/ /
+COPY --from=root /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=root /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=gobuild /out/world /usr/local/bin/world
-COPY --from=web /app/dist /srv
-COPY --from=web /app/dist-react /srv-react
-USER world
+COPY --from=web --chown=10001:10001 /app/dist /srv
+COPY --from=web --chown=10001:10001 /app/dist-react /srv-react
+USER 10001:10001
 EXPOSE 3000
 ENTRYPOINT ["/usr/local/bin/world", "--root=/srv", "--react-root=/srv-react", "--addr=:3000"]
