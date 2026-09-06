@@ -36,7 +36,12 @@ concurrency:
   group: release-world
   cancel-in-progress: false
 jobs:
-  build-amd64:
+  # ONE IMAGE, BOTH ARCHITECTURES. The lab runs amd64 (evo) and arm64 (spark),
+  # so an image built for one deploys on half the fleet. Both platforms come out
+  # of this one job: the pool is amd64, so the arm64 leg builds under emulation
+  # (binfmt below), and the push is a manifest list — which is also why nothing
+  # here can load the image locally.
+  build:
     runs-on: [hanzo-build-linux-amd64]
     steps:
       - name: Checkout (full history + tags — version floor read from tags)
@@ -86,6 +91,8 @@ jobs:
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "version_v=v${version}" >> "$GITHUB_OUTPUT"
           echo "Next release: v${version} (git_max='${git_max:-none}' container_max='${cont_max:-none}')"
+      - name: Register binfmt for the emulated arm64 leg
+        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -145,7 +152,7 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ghcr.io/hanzoai/world:${{ steps.ver.outputs.version }}
           provenance: false
