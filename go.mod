@@ -28,8 +28,3 @@ require (
 	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
 )
-
-// hanzoai/bucket v0.1.1 is tagged and pushed to github.com/hanzoai/bucket;
-// pinned to the local checkout until the forge mirror that this module path
-// resolves through (git.hanzo.ai) is reachable again.
-replace github.com/hanzoai/bucket => ../bucket
