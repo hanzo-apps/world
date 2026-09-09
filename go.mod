@@ -1,6 +1,6 @@
 module github.com/hanzoai/world
 
-go 1.26.4
+go 1.26.8
 
 require (
 	github.com/hanzoai/sqlite v0.3.2

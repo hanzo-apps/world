@@ -76,7 +76,7 @@ RUN pnpm build
 RUN pnpm build:react
 
 # ---- go stage: build the static server binary (CGO-free) -----------------
-# go 1.26: go.mod requires >= 1.26.4 (github.com/hanzoai/sqlite drop-in). The
+# go 1.26: go.mod requires >= 1.26.8 (github.com/hanzoai/sqlite drop-in). The
 # binary stays CGO-free — with CGO_ENABLED=0, hanzoai/sqlite selects its vendored
 # pure-Go engine (zero modernc.org/* in the module graph). That engine gates FTS5
 # behind the `sqlite_fts5` build tag, which the store's items_fts virtual table
