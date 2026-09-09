@@ -342,7 +342,7 @@ func livenessURL(name string) string {
 	case "world":
 		return "https://world.hanzo.ai/v1/world/health"
 	case "registry":
-		return "https://registry.hanzo.ai/v2/"
+		return "https://oci.hanzo.ai/v2/"
 	default:
 		return ""
 	}
