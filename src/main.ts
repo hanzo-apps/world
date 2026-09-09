@@ -7,7 +7,7 @@ import { initGtm } from './bootstrap/analytics';
 // all leave through POST /v1/event to Hanzo Cloud, lensed server-side into web
 // analytics, product analytics, and error tracking. It subsumes both the old
 // ~460 KB third-party Sentry client and the direct analytics.hanzo.ai page
-// script — one door, fanned out server-side. It is dependency-free and tiny, so
+// script — one endpoint, fanned out server-side. It is dependency-free and tiny, so
 // it rides the entry chunk and starts capturing immediately; a synchronous
 // buffer still catches anything thrown before install and replays it, so no
 // early boot error is lost.

@@ -2,7 +2,7 @@
 // GA / Facebook / LinkedIn / X marketing tags from GTM's UI (no per-pixel code).
 // This is an orthogonal concern to first-party product/web/error telemetry, which
 // flows through @hanzo/event (see bootstrap/telemetry.ts) to the ONE Hanzo Cloud
-// door and is fanned server-side into the web-analytics lens (analytics.hanzo.ai),
+// endpoint and is fanned server-side into the web-analytics lens (analytics.hanzo.ai),
 // so the app never loads that collector's page script directly. No-op until
 // VITE_GTM_ID is provisioned from KMS.
 

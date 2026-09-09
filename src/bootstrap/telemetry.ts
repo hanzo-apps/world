@@ -2,7 +2,7 @@
 //
 // Every kind of signal — pageview, product event, identify/group, AND errors —
 // leaves the app through a single client (@hanzo/event) to the ONE Hanzo Cloud
-// front door:
+// endpoint:
 //
 //   POST {host}/v1/event   body: { batch: [Event, …] }   ->  { accepted, dropped }
 //
@@ -11,7 +11,7 @@
 // analytics (analytics.hanzo.ai), product analytics (insights.hanzo.ai), and
 // error tracking (sentry.hanzo.ai). Errors are just `type:'error'` events on the
 // same pipe, so this subsumes both the standalone @sentry client and a direct
-// analytics.hanzo.ai (Umami) page-script — one door, fanned out server-side.
+// analytics.hanzo.ai (Umami) page-script — one endpoint, fanned out server-side.
 //
 // @hanzo/event is dependency-free and a few KB, so — unlike the old ~460 KB
 // Sentry bundle — it rides the entry chunk with negligible parse cost and starts
@@ -33,7 +33,7 @@ const isBrowser = (): boolean => typeof window !== 'undefined' && typeof documen
 
 // A write-only publishable ingest key (pk_…), if the deployment ships one. It is
 // safe to bundle (cannot read, only ingest) and lets logged-out visitors reach
-// the fail-closed door: the door verifies it to an org, so anonymous public
+// the fail-closed ingest boundary, which verifies it to an org, so anonymous public
 // pageviews and errors are accepted with no session. Mint with
 // POST /v1/keys {"type":"publishable"}.
 //
@@ -44,14 +44,14 @@ const isBrowser = (): boolean => typeof window !== 'undefined' && typeof documen
 // KMS or CI carries, so no builder could ever supply it and the key was always
 // undefined here.
 //
-// Absent, logged-out events are NOT best-effort: the door refuses them outright
+// Absent, logged-out events are NOT best-effort: ingest refuses them outright
 // with 401 ingest_key_required, measured live for pageviews and exceptions alike.
 function ingestKey(): string | undefined {
   const k = import.meta.env.VITE_PUBLISHABLE_KEY;
   return k && k.trim() ? k.trim() : undefined;
 }
 
-// Cloud front door by brand — mirrors services/iam.ts issuer resolution so a Lux
+// Cloud address by brand — mirrors services/iam.ts issuer resolution so a Lux
 // or Zoo white-label fork sends its telemetry to its own cloud, never Hanzo's.
 function resolveHost(): string {
   const h = isBrowser() ? location.hostname : '';
