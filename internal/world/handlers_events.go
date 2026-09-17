@@ -3,6 +3,7 @@ package world
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"math"
 	"net/http"
 	"sort"
@@ -80,9 +81,7 @@ type eventRecord struct {
 // consumer always has provenance and the caller can never alias a shared map.
 func mkRecord(topic, id string, ts time.Time, fields map[string]any) eventRecord {
 	p := make(map[string]any, len(fields)+3)
-	for k, v := range fields {
-		p[k] = v
-	}
+	maps.Copy(p, fields)
 	p["id"] = id
 	p["ts"] = ts.UTC().Format(time.RFC3339)
 	p["topic"] = topic
@@ -334,12 +333,12 @@ func (s *Server) newsRecords(ctx context.Context) []eventRecord {
 			ts = time.Now().UTC()
 		}
 		out = append(out, mkRecord(topicNews, "news:"+id, ts, map[string]any{
-			"title":   it.Title,
-			"link":    it.Link,
-			"pubDate": it.PubDate,
-			"tickers": it.Tickers,
+			"title":    it.Title,
+			"link":     it.Link,
+			"pubDate":  it.PubDate,
+			"tickers":  it.Tickers,
 			"category": "world",
-			"source":  "rss",
+			"source":   "rss",
 		}))
 	}
 	return out
@@ -373,9 +372,7 @@ func (s *Server) quoteRecords(ctx context.Context) []eventRecord {
 
 func cloneQuote(q map[string]any) map[string]any {
 	c := make(map[string]any, len(q))
-	for k, v := range q {
-		c[k] = v
-	}
+	maps.Copy(c, q)
 	return c
 }
 
@@ -573,7 +570,7 @@ func parseEventQuery(r *http.Request) eventQuery {
 		// bind out.topics (to the resolved set, possibly empty), so an all-unknown
 		// filter selects NOTHING rather than silently falling through to "all".
 		topics := map[string]bool{}
-		for _, name := range strings.Split(l, ",") {
+		for name := range strings.SplitSeq(l, ",") {
 			for _, t := range layerTopics[strings.ToLower(strings.TrimSpace(name))] {
 				topics[t] = true
 			}

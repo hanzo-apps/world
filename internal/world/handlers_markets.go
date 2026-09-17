@@ -250,7 +250,6 @@ func (s *Server) handleYahooBatch(w http.ResponseWriter, r *http.Request) {
 	sem := make(chan struct{}, yahooBatchParallel)
 	var wg sync.WaitGroup
 	for i, sym := range symbols {
-		i, sym := i, sym
 		results[i].Symbol = sym
 		wg.Add(1)
 		sem <- struct{}{}

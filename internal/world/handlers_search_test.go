@@ -1,7 +1,6 @@
 package world
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -52,8 +51,7 @@ func TestSearchEndpointEmptyNever5xx(t *testing.T) {
 
 func TestSearchAndAnalyticsReturnIngested(t *testing.T) {
 	s := newTestServer(t)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	go s.store.Lake.Run(ctx) // write-behind consumer
 
 	// Ingest via the same path the feed handlers use.

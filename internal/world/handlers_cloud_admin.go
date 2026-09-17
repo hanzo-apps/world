@@ -482,10 +482,7 @@ func (s *Server) handleCloudAnalytics(w http.ResponseWriter, r *http.Request) {
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, 6)
-	limit := len(sites.Data)
-	if limit > 8 {
-		limit = 8
-	}
+	limit := min(len(sites.Data), 8)
 	for _, ws := range sites.Data[:limit] {
 		wg.Add(1)
 		go func(id, name, domain string) {

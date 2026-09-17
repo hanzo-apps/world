@@ -3,6 +3,7 @@ package world
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"net/http"
 	"strings"
 	"time"
@@ -83,9 +84,7 @@ func (s *Server) handleFeedback(w http.ResponseWriter, r *http.Request) {
 	// Forward upstream with the caller's bearer + org/project selectors, then 204.
 	// Any upstream error is swallowed — the client never sees a feedback failure.
 	headers := map[string]string{"Authorization": bearer, "Content-Type": "application/json"}
-	for k, v := range aiForwardHeaders(r) {
-		headers[k] = v
-	}
+	maps.Copy(headers, aiForwardHeaders(r))
 	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 	defer cancel()
 	_, _, _ = s.do(ctx, "POST", s.ai.base+"/feedback", headers, whitelisted)

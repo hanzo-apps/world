@@ -20,10 +20,10 @@ func TestCachedJSONServesStaleAndRefreshes(t *testing.T) {
 	// Stale-but-not-fresh: Get misses, GetStale hits (fresh horizon already past).
 	s.cache.Set(key, map[string]any{"v": "old"}, -time.Second, time.Minute)
 
-	var calls int32
+	var calls atomic.Int32
 	release := make(chan struct{})
 	produce := func(ctx context.Context) (any, error) {
-		atomic.AddInt32(&calls, 1)
+		calls.Add(1)
 		<-release // hold the refresh open so the request path can't wait on it
 		return map[string]any{"v": "new"}, nil
 	}
@@ -60,7 +60,7 @@ func TestCachedJSONServesStaleAndRefreshes(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if got := atomic.LoadInt32(&calls); got != 1 {
+	if got := calls.Load(); got != 1 {
 		t.Fatalf("produce called %d times, want 1", got)
 	}
 }
@@ -70,9 +70,9 @@ func TestCachedJSONServesStaleAndRefreshes(t *testing.T) {
 func TestCachedJSONColdMissSingleFlight(t *testing.T) {
 	s := NewServer()
 	const key = "swr-cold"
-	var calls int32
+	var calls atomic.Int32
 	produce := func(ctx context.Context) (any, error) {
-		atomic.AddInt32(&calls, 1)
+		calls.Add(1)
 		time.Sleep(100 * time.Millisecond) // hold the leader so followers coalesce
 		return map[string]any{"v": "fresh"}, nil
 	}
@@ -81,7 +81,7 @@ func TestCachedJSONColdMissSingleFlight(t *testing.T) {
 	bodies := make([]string, n)
 	start := make(chan struct{})
 	var wg sync.WaitGroup
-	for i := 0; i < n; i++ {
+	for i := range n {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -95,7 +95,7 @@ func TestCachedJSONColdMissSingleFlight(t *testing.T) {
 	close(start)
 	wg.Wait()
 
-	if got := atomic.LoadInt32(&calls); got != 1 {
+	if got := calls.Load(); got != 1 {
 		t.Fatalf("produce called %d times, want 1 (cold misses must single-flight)", got)
 	}
 	for i, b := range bodies {

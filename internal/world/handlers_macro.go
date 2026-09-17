@@ -183,10 +183,7 @@ func (s *Server) computeMacroSignals(ctx context.Context) (any, error) {
 		if fng.Data[0].Classification != "" {
 			fgLabel = fng.Data[0].Classification
 		}
-		n := len(fng.Data)
-		if n > 30 {
-			n = 30
-		}
+		n := min(len(fng.Data), 30)
 		for i := n - 1; i >= 0; i-- {
 			d := fng.Data[i]
 			val, _ := parseIntSafe(d.Value)
@@ -238,9 +235,9 @@ func (s *Server) computeMacroSignals(ctx context.Context) (any, error) {
 			"technicalTrend": map[string]any{"status": trend, "btcPrice": ptrf(btcCur),
 				"sma50": ptr0(btcSma50), "sma200": ptr0(btcSma200), "vwap30d": ptrf(btcVwap),
 				"mayerMultiple": ptrf(mayer), "sparkline": sparkline(btcP, 30)},
-			"hashRate":  map[string]any{"status": hashStatus, "change30d": ptrf(hashChange)},
+			"hashRate":   map[string]any{"status": hashStatus, "change30d": ptrf(hashChange)},
 			"miningCost": map[string]any{"status": mining},
-			"fearGreed": map[string]any{"status": fgLabel, "value": ptri(fgValue), "history": fgHistory},
+			"fearGreed":  map[string]any{"status": fgLabel, "value": ptri(fgValue), "history": fgHistory},
 		},
 		"meta": map[string]any{"qqqSparkline": sparkline(qqqP, 30)},
 	}, nil

@@ -2,6 +2,7 @@ package world
 
 import (
 	"errors"
+	"maps"
 	"sort"
 	"sync"
 	"time"
@@ -188,9 +189,7 @@ func (l *ledger) snapshotPositions() map[string]position {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	out := make(map[string]position, len(l.positions))
-	for k, v := range l.positions {
-		out[k] = v
-	}
+	maps.Copy(out, l.positions)
 	return out
 }
 

@@ -104,7 +104,7 @@ func TestRenderCommandContract(t *testing.T) {
 
 func TestRenderCommandContractDeterministic(t *testing.T) {
 	a := renderCommandContract(defaultCommands())
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if b := renderCommandContract(defaultCommands()); b != a {
 			t.Fatal("renderCommandContract is not deterministic across runs")
 		}
@@ -171,7 +171,7 @@ func TestParseAnalystTurnTools(t *testing.T) {
 	// Tool calls are capped per round.
 	var many strings.Builder
 	many.WriteString(`{"tools":[`)
-	for i := 0; i < analystMaxToolsPerRound+3; i++ {
+	for i := range analystMaxToolsPerRound + 3 {
 		if i > 0 {
 			many.WriteByte(',')
 		}
@@ -199,7 +199,7 @@ func TestRenderToolContract(t *testing.T) {
 		t.Errorf("optional params not marked with ?:\n%s", contract)
 	}
 	// Deterministic across runs.
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if renderToolContract(mcp.ToolSpecs()) != contract {
 			t.Fatal("renderToolContract is not deterministic")
 		}
@@ -212,13 +212,13 @@ func TestRenderToolContract(t *testing.T) {
 // returns a final grounded answer. The response must carry the tool trace and the
 // reply, and the inference server must have been called exactly twice.
 func TestAnalystDataToolLoop(t *testing.T) {
-	var calls int32
+	var calls atomic.Int32
 	ai := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasSuffix(r.URL.Path, "/chat/completions") {
 			http.Error(w, "unexpected path "+r.URL.Path, http.StatusNotFound)
 			return
 		}
-		n := atomic.AddInt32(&calls, 1)
+		n := calls.Add(1)
 		var content string
 		if n == 1 {
 			// Round 1: request the data tool.
@@ -272,7 +272,7 @@ func TestAnalystDataToolLoop(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if got := atomic.LoadInt32(&calls); got != 2 {
+	if got := calls.Load(); got != 2 {
 		t.Fatalf("inference calls = %d, want 2 (one tool round + final answer)", got)
 	}
 	if out.Reply == "" {

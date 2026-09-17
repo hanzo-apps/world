@@ -2,6 +2,7 @@ package world
 
 import (
 	"context"
+	"maps"
 	"math"
 	"net/http"
 	"sync"
@@ -148,9 +149,7 @@ func (s *Server) computeSentiment(ctx context.Context) (map[string]any, bool) {
 	regions := make([]map[string]any, 0, len(sentimentRegions))
 	for _, rq := range sentimentRegions {
 		entry := map[string]any{"code": rq.id, "name": rq.name}
-		for k, v := range toneReading(series[rq.id]) {
-			entry[k] = v
-		}
+		maps.Copy(entry, toneReading(series[rq.id]))
 		regions = append(regions, entry)
 	}
 
@@ -266,10 +265,7 @@ func seriesVelocity(vals []float64) float64 {
 	if n < 4 {
 		return 0
 	}
-	q := n / 4
-	if q < 1 {
-		q = 1
-	}
+	q := max(n/4, 1)
 	recent := meanOf(vals[n-q:])
 	earlier := meanOf(vals[n-2*q : n-q])
 	return recent - earlier
@@ -297,7 +293,7 @@ func downsample(vals []float64, n int) []float64 {
 	}
 	out := make([]float64, 0, n)
 	step := float64(len(vals)-1) / float64(n-1)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		idx := int(math.Round(float64(i) * step))
 		if idx >= len(vals) {
 			idx = len(vals) - 1
@@ -316,9 +312,7 @@ func sentimentWarming() map[string]any {
 	regions := make([]map[string]any, 0, len(sentimentRegions))
 	for _, rq := range sentimentRegions {
 		entry := map[string]any{"code": rq.id, "name": rq.name}
-		for k, v := range toneReading(nil) {
-			entry[k] = v
-		}
+		maps.Copy(entry, toneReading(nil))
 		regions = append(regions, entry)
 	}
 	return map[string]any{

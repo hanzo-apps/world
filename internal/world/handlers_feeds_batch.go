@@ -105,7 +105,6 @@ func (s *Server) handleFeedsBatch(w http.ResponseWriter, r *http.Request) {
 	sem := make(chan struct{}, feedsBatchParallel)
 	var wg sync.WaitGroup
 	for i, feedURL := range req.URLs {
-		i, feedURL := i, feedURL
 		results[i] = feedBatchResult{URL: feedURL, Items: []feedBatchItem{}}
 		parsed, err := url.Parse(feedURL)
 		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || !allowedRSSDomains[parsed.Hostname()] {

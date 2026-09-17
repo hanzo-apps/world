@@ -76,19 +76,19 @@ RUN pnpm build
 RUN pnpm build:react
 
 # ---- go stage: build the static server binary (CGO-free) -----------------
-# go 1.26: go.mod requires >= 1.26.8 (github.com/hanzoai/sqlite drop-in). The
+# go 1.27: go.mod requires >= 1.27.1. The
 # binary stays CGO-free — with CGO_ENABLED=0, hanzoai/sqlite selects its vendored
 # pure-Go engine (zero modernc.org/* in the module graph). That engine gates FTS5
 # behind the `sqlite_fts5` build tag, which the store's items_fts virtual table
 # needs — so the build below MUST carry `-tags sqlite_fts5` or Open degrades.
-FROM golang:1.26.5-alpine AS gobuild
+FROM golang:1.27.1-alpine AS gobuild
 WORKDIR /src
 # Every module in this graph, github.com/hanzoai/csqlite included, is public:
 # the module proxy serves it and the checksum database records it. `go mod
 # download` therefore needs no credential and no git binary, and go.sum stays
 # authoritative for every dependency.
 #
-# Deps: hanzo-kv client (go-redis) + embedded SQLite (modernc). Download once for
+# Deps: the cloud KV client (hanzoai/bucket) + embedded SQLite. Download once for
 # a cached layer before the source is copied.
 COPY go.mod go.sum ./
 RUN go mod download

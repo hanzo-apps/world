@@ -193,7 +193,7 @@ func (s *Server) foldRoutingLedger(ctx context.Context, since string) (ensoLedge
 	models := map[string]int{}
 	sources := map[string]int{}
 	var confSum float64
-	for _, line := range strings.Split(body, "\n") {
+	for line := range strings.SplitSeq(body, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -227,7 +227,7 @@ func (s *Server) foldRoutingLedger(ctx context.Context, since string) (ensoLedge
 	if rbody, rerr := s.getText(ctx, host+"/v1/router/rewards?since="+url.QueryEscape(since), hdr); rerr == nil {
 		var sum float64
 		n := 0
-		for _, line := range strings.Split(rbody, "\n") {
+		for line := range strings.SplitSeq(rbody, "\n") {
 			line = strings.TrimSpace(line)
 			if line == "" {
 				continue

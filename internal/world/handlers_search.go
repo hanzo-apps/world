@@ -79,8 +79,8 @@ func parseSince(raw string) time.Time {
 	if t, err := time.Parse(time.RFC3339, raw); err == nil {
 		return t
 	}
-	if strings.HasSuffix(raw, "d") {
-		if n, err := strconv.Atoi(strings.TrimSuffix(raw, "d")); err == nil && n > 0 {
+	if before, ok := strings.CutSuffix(raw, "d"); ok {
+		if n, err := strconv.Atoi(before); err == nil && n > 0 {
 			return time.Now().Add(-time.Duration(n) * 24 * time.Hour)
 		}
 	}

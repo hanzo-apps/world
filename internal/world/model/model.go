@@ -16,6 +16,7 @@
 package model
 
 import (
+	"maps"
 	"math"
 	"sort"
 	"sync"
@@ -175,15 +176,11 @@ func (st *Store) Apply(obs []Observation, at time.Time) []Change {
 		metrics := map[string]float64{}
 		var prevInst, prevVol float64
 		if prev != nil {
-			for m, v := range prev.Metrics {
-				metrics[m] = v
-			}
+			maps.Copy(metrics, prev.Metrics)
 			prevInst = prev.Metrics[MetricInstability]
 			prevVol = prev.Metrics[MetricNewsVolume]
 		}
-		for m, v := range g.metrics {
-			metrics[m] = v
-		}
+		maps.Copy(metrics, g.metrics)
 
 		// Derived, in one place: news velocity (only when volume refreshed this
 		// cycle) then the composite instability.

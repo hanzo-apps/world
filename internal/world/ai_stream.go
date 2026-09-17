@@ -40,8 +40,8 @@ func (a *AIClient) chatMessagesModelStream(ctx context.Context, s *Server, beare
 		chatRequest
 		Stream bool `json:"stream"`
 	}{
-		chatRequest: chatRequest{Model: model, Messages: messages, Temperature: temperature, MaxTokens: maxTokens, TopP: 0.9},
-		Stream:      true,
+		Model: model, Messages: messages, Temperature: temperature, MaxTokens: maxTokens, TopP: 0.9,
+		Stream: true,
 	})
 	if err != nil {
 		return "", 0, "", err

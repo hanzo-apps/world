@@ -26,7 +26,7 @@ var noRedirectClient = &http.Client{
 // itself by what the host asked for (see hostGate).
 func (s *Server) getAllowlisted(ctx context.Context, rawURL string, allowed map[string]bool, headers map[string]string) ([]byte, int, http.Header, error) {
 	next := rawURL
-	for hop := 0; hop < 6; hop++ {
+	for range 6 {
 		u, err := url.Parse(next)
 		if err != nil {
 			return nil, 0, nil, err

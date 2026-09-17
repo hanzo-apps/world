@@ -156,7 +156,7 @@ func sanitizeGDELTQuery(v string) string {
 var allowedRSSDomains = map[string]bool{}
 
 func init() {
-	for _, d := range strings.Fields(rssDomainList) {
+	for d := range strings.FieldsSeq(rssDomainList) {
 		allowedRSSDomains[d] = true
 	}
 }

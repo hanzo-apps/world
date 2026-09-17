@@ -52,7 +52,7 @@ func TestCacheNegativeDoesNotClobberValue(t *testing.T) {
 // upstreamStub is a counting httptest upstream with a settable response.
 type upstreamStub struct {
 	srv    *httptest.Server
-	hits   int32
+	hits   atomic.Int32
 	status int
 	body   string
 }
@@ -60,14 +60,14 @@ type upstreamStub struct {
 func newUpstreamStub(status int, body string) *upstreamStub {
 	u := &upstreamStub{status: status, body: body}
 	u.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		atomic.AddInt32(&u.hits, 1)
+		u.hits.Add(1)
 		w.WriteHeader(u.status)
 		_, _ = w.Write([]byte(u.body))
 	}))
 	return u
 }
 
-func (u *upstreamStub) hitCount() int32 { return atomic.LoadInt32(&u.hits) }
+func (u *upstreamStub) hitCount() int32 { return u.hits.Load() }
 func (u *upstreamStub) close()          { u.srv.Close() }
 
 func TestPassthroughBlankBodyNotCached(t *testing.T) {

@@ -31,7 +31,7 @@ func TestAIStatusError(t *testing.T) {
 // TestTrim80 caps a long upstream message to 80 runes without splitting UTF-8.
 func TestTrim80(t *testing.T) {
 	long := ""
-	for i := 0; i < 200; i++ {
+	for range 200 {
 		long += "x"
 	}
 	if got := trim80(long); len([]rune(got)) != 80 {

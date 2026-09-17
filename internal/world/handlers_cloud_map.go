@@ -751,10 +751,7 @@ func (s *Server) tryRealTraffic(ctx context.Context) ([]trafficArc, bool) {
 
 	countries := map[string]int64{}
 	var mu sync.Mutex
-	limit := len(sites.Data)
-	if limit > 8 {
-		limit = 8
-	}
+	limit := min(len(sites.Data), 8)
 	for _, ws := range sites.Data[:limit] {
 		mergeMetric(ctx, s, base, ws.ID, "country", q, hdr, countries, &mu)
 	}

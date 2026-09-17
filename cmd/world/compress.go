@@ -39,7 +39,7 @@ func gzipStatic(next http.Handler) http.Handler {
 }
 
 func acceptsGzip(r *http.Request) bool {
-	for _, enc := range strings.Split(r.Header.Get("Accept-Encoding"), ",") {
+	for enc := range strings.SplitSeq(r.Header.Get("Accept-Encoding"), ",") {
 		if strings.EqualFold(strings.TrimSpace(strings.SplitN(enc, ";", 2)[0]), "gzip") {
 			return true
 		}

@@ -17,9 +17,9 @@ func TestValidateYahooSymbols(t *testing.T) {
 	}{
 		{"", nil},
 		{"spy", []string{"SPY"}},
-		{"SPY,spy,Spy", []string{"SPY"}},                       // dedup, case-insensitive
+		{"SPY,spy,Spy", []string{"SPY"}}, // dedup, case-insensitive
 		{"EURUSD=X,GC=F,^GSPC", []string{"EURUSD=X", "GC=F", "^GSPC"}}, // FX / futures / index chars
-		{"SPY,bad!sym,,DX-Y.NYB", []string{"SPY", "DX-Y.NYB"}}, // drop invalid + empty
+		{"SPY,bad!sym,,DX-Y.NYB", []string{"SPY", "DX-Y.NYB"}},         // drop invalid + empty
 	}
 	for _, c := range cases {
 		if got := validateYahooSymbols(c.in); !reflect.DeepEqual(got, c.want) {
@@ -28,7 +28,7 @@ func TestValidateYahooSymbols(t *testing.T) {
 	}
 	// cap enforced
 	many := make([]byte, 0)
-	for i := 0; i < yahooBatchMaxSymbols+10; i++ {
+	for i := range yahooBatchMaxSymbols + 10 {
 		if i > 0 {
 			many = append(many, ',')
 		}

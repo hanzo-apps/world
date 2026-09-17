@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 	"time"
@@ -181,9 +182,7 @@ func (a *AIClient) chatMessagesModel(ctx context.Context, s *Server, bearer, mod
 		"Authorization": bearer,
 		"Content-Type":  "application/json",
 	}
-	for k, v := range extra {
-		headers[k] = v
-	}
+	maps.Copy(headers, extra)
 	cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	body, status, err := s.do(cctx, "POST", a.base+"/chat/completions", headers, reqBody)
@@ -333,8 +332,7 @@ func aiStatusError(status int, body []byte) error {
 // semantics (no message keyword-matching) nor invents codes the backend never
 // sends. The analyst renders a top-up CTA for exactly this case.
 func balanceErrorFrom(err error) bool {
-	var ae *aiError
-	if errors.As(err, &ae) {
+	if ae, ok := errors.AsType[*aiError](err); ok {
 		return ae.status == http.StatusPaymentRequired || ae.code == "insufficient_balance"
 	}
 	return false

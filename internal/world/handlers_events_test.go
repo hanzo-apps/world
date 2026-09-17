@@ -160,7 +160,7 @@ type streamRec struct {
 	once    sync.Once
 }
 
-func newStreamRec() *streamRec { return &streamRec{hdr: http.Header{}, gotLine: make(chan struct{})} }
+func newStreamRec() *streamRec           { return &streamRec{hdr: http.Header{}, gotLine: make(chan struct{})} }
 func (r *streamRec) Header() http.Header { return r.hdr }
 func (r *streamRec) WriteHeader(c int)   { r.code = c }
 func (r *streamRec) Flush()              {}
@@ -204,7 +204,7 @@ func TestEventsStreamNDJSONAllMirrorAndCancel(t *testing.T) {
 		t.Fatalf("stream Content-Type = %q", ct)
 	}
 	specific, all := 0, 0
-	for _, line := range strings.Split(w.body(), "\n") {
+	for line := range strings.SplitSeq(w.body(), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue

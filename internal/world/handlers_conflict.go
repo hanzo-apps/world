@@ -212,10 +212,7 @@ func (s *Server) fetchUCDPEvents(ctx context.Context) (any, error) {
 		return nil, httpErr(502)
 	}
 
-	totalPages := asInt(mapGet(page0, "TotalPages"))
-	if totalPages < 1 {
-		totalPages = 1
-	}
+	totalPages := max(asInt(mapGet(page0, "TotalPages")), 1)
 	newest := totalPages - 1
 
 	parseMs := func(v any) (int64, bool) {

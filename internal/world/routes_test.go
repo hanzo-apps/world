@@ -45,7 +45,6 @@ func TestRoutesRespond(t *testing.T) {
 	}
 
 	for _, route := range s.Routes() {
-		route := route
 		t.Run(route, func(t *testing.T) {
 			t.Parallel()
 			url := ts.URL + route + qs[route]

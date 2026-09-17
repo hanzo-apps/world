@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -203,10 +204,5 @@ func TestFeedCacheEvictsOldest(t *testing.T) {
 }
 
 func hasURL(ss []string, want string) bool {
-	for _, s := range ss {
-		if s == want {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(ss, want)
 }

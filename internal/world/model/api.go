@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"maps"
 	"net/http"
 	"strconv"
 	"strings"
@@ -185,9 +186,7 @@ func (e *Engine) handleStream(w http.ResponseWriter, r *http.Request) {
 
 func writeEnvelope(w http.ResponseWriter, asOf time.Time, fields map[string]any) {
 	env := map[string]any{"v": SchemaVersion, "asOf": asOf.Format(time.RFC3339)}
-	for k, v := range fields {
-		env[k] = v
-	}
+	maps.Copy(env, fields)
 	writeJSON(w, http.StatusOK, env)
 }
 

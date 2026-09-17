@@ -1,6 +1,7 @@
 package world
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -40,12 +41,7 @@ func daysAgoUTC(n int) string { return dateOnly(time.Now().Add(-time.Duration(n)
 
 // oneOf reports whether v is in the allowed set.
 func oneOf(v string, allowed ...string) bool {
-	for _, a := range allowed {
-		if v == a {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(allowed, v)
 }
 
 // round1 rounds to one decimal place.

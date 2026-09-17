@@ -207,7 +207,6 @@ func (s *Server) fetchCloses(ctx context.Context, symbols []string) map[string][
 	sem := make(chan struct{}, rotationParallel)
 	var wg sync.WaitGroup
 	for _, sym := range symbols {
-		sym := sym
 		wg.Add(1)
 		sem <- struct{}{}
 		go func() {
@@ -291,13 +290,10 @@ func pctReturn(closes []float64, n int) float64 {
 // (most-recent bars) so equal indices are the same recent trading day even when
 // two listings have slightly different history lengths.
 func relSeries(a, b []float64) []float64 {
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
-	}
+	n := min(len(b), len(a))
 	a, b = a[len(a)-n:], b[len(b)-n:]
 	out := make([]float64, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if b[i] != 0 {
 			out[i] = a[i] / b[i]
 		}
@@ -408,10 +404,7 @@ func basketSynthetic(members [][]float64) []float64 {
 
 // trailingZ is the z-score of x[i] within the window ending at i.
 func trailingZ(x []float64, i, window int) float64 {
-	lo := i - window + 1
-	if lo < 0 {
-		lo = 0
-	}
+	lo := max(i-window+1, 0)
 	seg := x[lo : i+1]
 	m, sd := meanStd(seg)
 	if sd == 0 {
@@ -457,7 +450,7 @@ func meanStd(xs []float64) (mean, std float64) {
 // the distribution (AI/semis rolling over from leadership) and accumulation
 // (energy complex momentum turning up) legs are live.
 func rotationSignals(byKey map[string]*rrgPoint) ([]map[string]any, string) {
-	ai := worst(byKey, "ai_semis", "hyperscalers")             // topmost of the AI complex
+	ai := worst(byKey, "ai_semis", "hyperscalers") // topmost of the AI complex
 	energy := best(byKey, "energy", "natgas", "uranium", "nuclear_power")
 
 	distScore := distributionScore(ai)
@@ -514,8 +507,8 @@ func distributionScore(p *rrgPoint) float64 {
 	if p == nil {
 		return 0
 	}
-	lead := clamp01((p.ratio - 100) / 5)   // how far above the benchmark
-	roll := clamp01((100 - p.mom) / 5)      // how hard momentum is rolling over
+	lead := clamp01((p.ratio - 100) / 5) // how far above the benchmark
+	roll := clamp01((100 - p.mom) / 5)   // how hard momentum is rolling over
 	return lead*0.5 + roll*0.5
 }
 
@@ -525,8 +518,8 @@ func accumulationScore(p *rrgPoint) float64 {
 	if p == nil {
 		return 0
 	}
-	base := clamp01((100 - p.ratio) / 5)    // how far below the benchmark it started
-	turn := clamp01((p.mom - 100) / 5)      // how hard momentum is turning up
+	base := clamp01((100 - p.ratio) / 5) // how far below the benchmark it started
+	turn := clamp01((p.mom - 100) / 5)   // how hard momentum is turning up
 	// A theme already Leading still counts as strong accumulation if momentum is high.
 	if p.ratio >= 100 {
 		base = 0.5

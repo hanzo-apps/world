@@ -115,7 +115,7 @@ func (s *Server) handleWorldBank(w http.ResponseWriter, r *http.Request) {
 func reshapeWorldBank(body []byte, indicator string) map[string]any {
 	empty := map[string]any{
 		"indicator": indicator, "indicatorName": wbName(indicator, ""),
-		"metadata": map[string]any{"page": 1, "pages": 1, "total": 0},
+		"metadata":  map[string]any{"page": 1, "pages": 1, "total": 0},
 		"byCountry": map[string]any{}, "latestByCountry": map[string]any{}, "timeSeries": []any{},
 	}
 	var pair []json.RawMessage
@@ -127,11 +127,11 @@ func reshapeWorldBank(body []byte, indicator string) map[string]any {
 	}
 	_ = decodeNumberInto(pair[0], &meta)
 	var records []struct {
-		CountryISO3 string          `json:"countryiso3code"`
+		CountryISO3 string                     `json:"countryiso3code"`
 		Country     struct{ ID, Value string } `json:"country"`
-		Date        string          `json:"date"`
-		Value       *float64        `json:"value"`
-		Indicator   struct{ Value string } `json:"indicator"`
+		Date        string                     `json:"date"`
+		Value       *float64                   `json:"value"`
+		Indicator   struct{ Value string }     `json:"indicator"`
 	}
 	if err := json.Unmarshal(pair[1], &records); err != nil || len(records) == 0 {
 		return empty
@@ -209,7 +209,9 @@ func (s *Server) handleEIA(w http.ResponseWriter, r *http.Request) {
 		s.cachedJSON(w, "eia:petroleum", "public, max-age=1800, s-maxage=1800, stale-while-revalidate=300",
 			30*time.Minute, 2*time.Hour,
 			func(ctx context.Context) (any, error) { return s.eiaPetroleum(ctx, key) },
-			func(w http.ResponseWriter, err error) { writeJSON(w, http.StatusOK, "", map[string]any{"error": "upstream unavailable", "series": []any{}}) })
+			func(w http.ResponseWriter, err error) {
+				writeJSON(w, http.StatusOK, "", map[string]any{"error": "upstream unavailable", "series": []any{}})
+			})
 	default:
 		writeError(w, http.StatusNotFound, "Not found")
 	}
@@ -277,10 +279,16 @@ func (s *Server) handleUNHCR(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) unhcrAggregate(ctx context.Context) (any, error) {
-	type agg struct{ refugees, asylum, idps, stateless float64; name string }
+	type agg struct {
+		refugees, asylum, idps, stateless float64
+		name                              string
+	}
 	byOrigin := map[string]*agg{}
 	byAsylum := map[string]*agg{}
-	type flow struct{ originCode, originName, asylumCode, asylumName string; refugees float64 }
+	type flow struct {
+		originCode, originName, asylumCode, asylumName string
+		refugees                                       float64
+	}
 	flows := map[string]*flow{}
 	var tR, tA, tI, tS float64
 
@@ -536,7 +544,6 @@ func decodeNumberInto(b []byte, v any) error { return json.Unmarshal(b, v) }
 func runParallelKV(m map[string]string, fn func(k, v string)) {
 	fns := make([]func(), 0, len(m))
 	for k, v := range m {
-		k, v := k, v
 		fns = append(fns, func() { fn(k, v) })
 	}
 	runParallel(fns...)

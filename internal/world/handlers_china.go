@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -100,7 +101,7 @@ type chinaMacroSnapshot struct {
 // horizon) shared by the complete/unavailable builders.
 type indicatorDef struct {
 	id, label, category, unit, source, sourceURL string
-	maxAgeDays                                    int
+	maxAgeDays                                   int
 }
 
 var chinaRequiredCategories = []string{"price", "activity", "policy", "fx"}
@@ -189,10 +190,8 @@ func latestTwo(rows []dateValue) (dateValue, *float64) {
 
 func csvColumn(header []string, names ...string) int {
 	for i, h := range header {
-		for _, n := range names {
-			if h == n {
-				return i
-			}
+		if slices.Contains(names, h) {
+			return i
 		}
 	}
 	return -1

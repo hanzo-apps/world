@@ -97,11 +97,11 @@ func frontmatter(b []byte) map[string]string {
 		return out
 	}
 	rest := s[len("---"):]
-	end := strings.Index(rest, "\n---")
-	if end < 0 {
+	before, _, ok := strings.Cut(rest, "\n---")
+	if !ok {
 		return out
 	}
-	for _, line := range strings.Split(rest[:end], "\n") {
+	for line := range strings.SplitSeq(before, "\n") {
 		line = strings.TrimSpace(line)
 		k, v, ok := strings.Cut(line, ":")
 		if !ok {

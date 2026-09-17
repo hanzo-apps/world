@@ -37,7 +37,7 @@ import (
 // final authz.
 func adminOrgs() map[string]bool {
 	m := map[string]bool{"admin": true, "built-in": true}
-	for _, o := range strings.Split(env("WORLD_ADMIN_ORGS"), ",") {
+	for o := range strings.SplitSeq(env("WORLD_ADMIN_ORGS"), ",") {
 		if o = strings.TrimSpace(o); o != "" {
 			m[o] = true
 		}

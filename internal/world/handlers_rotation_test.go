@@ -9,7 +9,7 @@ import (
 // a base — a clean synthetic where relative strength is known by construction.
 func ramp(base, perBar float64, n int) []float64 {
 	out := make([]float64, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		out[i] = base + perBar*float64(i)
 	}
 	return out
@@ -19,7 +19,7 @@ func ramp(base, perBar float64, n int) []float64 {
 // the shape of an Improving theme (relative momentum turning up from a base).
 func accelerate(base float64, n int) []float64 {
 	out := make([]float64, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		t := float64(i) / float64(n-1)
 		out[i] = base * (1 + 0.05*t*t) // quadratic curl-up
 	}
@@ -30,7 +30,7 @@ func accelerate(base float64, n int) []float64 {
 // the shape of a Weakening leader (relative momentum rolling over at the top).
 func decelerate(base float64, n int) []float64 {
 	out := make([]float64, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		t := float64(i) / float64(n-1)
 		out[i] = base * (1 + 0.25*math.Sqrt(t)) // fast then flat
 	}
@@ -52,8 +52,8 @@ func TestPctReturn(t *testing.T) {
 func TestBasketSyntheticEqualWeightsScale(t *testing.T) {
 	// A cheap fund and an expensive stock, both up the SAME 10% over the window,
 	// must contribute equally — the synthetic ends at 110 (indexed to 100 base).
-	cheap := ramp(2, 0.2/29, 30)     // 2.0 → 2.2  (+10%)
-	dear := ramp(900, 90.0/29, 30)   // 900 → 990 (+10%)
+	cheap := ramp(2, 0.2/29, 30)   // 2.0 → 2.2  (+10%)
+	dear := ramp(900, 90.0/29, 30) // 900 → 990 (+10%)
 	synth := basketSynthetic([][]float64{cheap, dear})
 	if len(synth) != 30 {
 		t.Fatalf("len = %d, want 30", len(synth))
@@ -101,8 +101,8 @@ func TestQuadrantClassification(t *testing.T) {
 // Weakening and score as distribution. This is the AI/semis "top" leg.
 func TestDistributionShapeIsWeakening(t *testing.T) {
 	n := 140
-	bench := ramp(100, 0.01, n)      // benchmark drifts up gently
-	leader := decelerate(100, n)     // outperformed hard early, now flattening
+	bench := ramp(100, 0.01, n)  // benchmark drifts up gently
+	leader := decelerate(100, n) // outperformed hard early, now flattening
 	p, ok := rrgLatest(relSeries(leader, bench))
 	if !ok {
 		t.Fatal("expected a point")
@@ -125,8 +125,8 @@ func TestDistributionShapeIsWeakening(t *testing.T) {
 // accumulation. This is the energy/uranium "base" leg.
 func TestAccumulationShapeIsImproving(t *testing.T) {
 	n := 140
-	bench := ramp(100, 0.05, n)      // benchmark trends up
-	laggard := accelerate(80, n)     // below benchmark but curling up late
+	bench := ramp(100, 0.05, n)  // benchmark trends up
+	laggard := accelerate(80, n) // below benchmark but curling up late
 	p, ok := rrgLatest(relSeries(laggard, bench))
 	if !ok {
 		t.Fatal("expected a point")
@@ -181,7 +181,7 @@ func TestPositiveClosesDropsBadBars(t *testing.T) {
 // After sanitising, a series with a bad bar reads the SAME quadrant as the clean one.
 func TestZeroBarDoesNotFlipQuadrant(t *testing.T) {
 	n := 140
-	clean := ramp(100, 0.4, n)   // steady outperformer
+	clean := ramp(100, 0.4, n) // steady outperformer
 	bench := ramp(100, 0.05, n)
 	pClean, ok := rrgLatest(relSeries(clean, bench))
 	if !ok {
