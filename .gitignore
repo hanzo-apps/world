@@ -43,3 +43,8 @@ data/world.db-shm
 package-lock.json
 yarn.lock
 bun.lockb
+
+# Local symlinks to LLM.md
+AGENTS.md
+GEMINI.md
+QWEN.md
