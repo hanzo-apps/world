@@ -153,7 +153,7 @@ func (c *Client) SetBytes(ctx context.Context, key string, val []byte, ttl time.
 // writers can race and one renewal can be lost; the registry is a self-healing
 // hint (a missed renewal waits for the next request), never a correctness value.
 
-// ZAdd adds/renews members at time at. Best-effort.
+// ZAdd sets each member's stamp to at, as ZADD sets a score. Best-effort.
 func (c *Client) ZAdd(ctx context.Context, key string, at time.Time, members ...string) {
 	if !c.available() || len(members) == 0 || !c.ensureSets(ctx) {
 		return
@@ -165,7 +165,7 @@ func (c *Client) ZAdd(ctx context.Context, key string, at time.Time, members ...
 	ts := at.Unix()
 	changed := false
 	for _, m := range members {
-		if prev, seen := cur[m]; !seen || prev < ts {
+		if prev, seen := cur[m]; !seen || prev != ts {
 			cur[m] = ts
 			changed = true
 		}

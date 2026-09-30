@@ -63,7 +63,7 @@ var kmsBootTimeout = 5 * time.Second
 // and is skipped.
 var worldSecretKeys = []string{
 	"HANZO_CLOUD_PULSE_TOKEN", // cloud-map pulse backend service token
-	"HANZO_KV_PASSWORD",       // hanzo-kv auth (unset today; read at boot, after this)
+	"HANZO_API_TOKEN",         // shared cache (cloud /v1/kv) bearer, read at boot after this
 	"HANZO_AI_BASE",           // AI gateway base URL override
 	"HANZO_AI_MODEL",          // AI default model override
 	"YOUTUBE_API_KEY",         // live-video reliability

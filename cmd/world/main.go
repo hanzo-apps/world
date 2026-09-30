@@ -48,7 +48,7 @@ func main() {
 	world.LoadKMSSecrets(rootCtx)
 
 	srv := world.NewServer()
-	defer srv.Close()           // release hanzo-kv + embedded datastore handles
+	defer srv.Close()           // release the shared KV + embedded datastore handles
 	srv.StartModel(rootCtx)     // continuously-folded world-state engine
 	srv.StartDatastore(rootCtx) // shared feed warmer + lake write-behind/prune
 	srv.StartFund(rootCtx)      // autonomous PAPER-only multi-asset fund brain

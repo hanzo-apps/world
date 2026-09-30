@@ -11,7 +11,7 @@ import (
 //
 // The hot keys are the ones the SPA hits on every load: the analyst grounding
 // snapshot (gdelt-doc query=world) and the protests panel (gdelt-geo default).
-// Each pod warms its OWN in-memory cache (unlike the shared hanzo-kv feed cache,
+// Each pod warms its OWN in-memory cache (unlike the shared KV feed cache,
 // there is no cross-pod copy to reuse), on boot and every ~4min — just under the
 // TTL, so a key is refreshed before it can expire. GDELT rate-limits callers to
 // one request per ~5s, so the specs are walked sequentially with gdeltPace gaps.

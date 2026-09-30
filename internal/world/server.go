@@ -48,7 +48,7 @@ type Server struct {
 	mcp        *mcp.Server
 	fund       *fundEngine // autonomous PAPER-only multi-asset fund brain
 
-	// Datastore layer (see datastore.go): kv is the shared hanzo-kv hot cache,
+	// Datastore layer (see datastore.go): kv is the shared cloud KV hot cache,
 	// feeds is the two-tier warm feed-body cache in front of it, and store is the
 	// embedded SQLite lake + per-identity settings.
 	kv    *kv.Client

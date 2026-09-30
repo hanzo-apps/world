@@ -35,7 +35,7 @@ func stubFeed(t *testing.T) (feedURL string, hits *int32) {
 }
 
 // newTestServer builds a Server with the embedded store in a temp dir and
-// hanzo-kv disabled (pure per-pod cache) — hermetic, no external services.
+// shared KV disabled (pure per-pod cache) — hermetic, no external services.
 func newTestServer(t *testing.T) *Server {
 	t.Helper()
 	t.Setenv("WORLD_DATA_DIR", t.TempDir())

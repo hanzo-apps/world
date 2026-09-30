@@ -18,7 +18,7 @@ import (
 // exact key its sibling handler uses — the same "seed the cache, no network"
 // technique the dashboard tests use for identity.
 
-// gwServer builds an offline server (no hanzo-kv, temp data dir).
+// gwServer builds an offline server (no shared KV, temp data dir).
 func gwServer(t *testing.T) *Server {
 	t.Helper()
 	t.Setenv("WORLD_KV_DISABLE", "1")

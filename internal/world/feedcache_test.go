@@ -76,7 +76,7 @@ func TestFeedEncodeDecodeRoundTrip(t *testing.T) {
 	}
 }
 
-// TestFeedCacheSharedAcrossPods proves the L2 (hanzo-kv) tier: a body written by
+// TestFeedCacheSharedAcrossPods proves the L2 (shared KV) tier: a body written by
 // one pod is served to another pod whose L1 is cold — i.e. warming once benefits
 // the fleet, and a restarted pod (empty L1) reads a still-warm shared cache.
 func TestFeedCacheSharedAcrossPods(t *testing.T) {
@@ -154,11 +154,11 @@ func TestWarmSetForgetsUnrequestedFeeds(t *testing.T) {
 	}
 }
 
-// TestFeedCacheDegradesWithoutKV proves the graceful fallback: with hanzo-kv
+// TestFeedCacheDegradesWithoutKV proves the graceful fallback: with the shared KV
 // disabled the cache is per-pod (L1 only) and correct — a "restart" (new cache)
 // is cold, never a crash.
 func TestFeedCacheDegradesWithoutKV(t *testing.T) {
-	disabled := kv.Open("", "") // no hanzo-kv
+	disabled := kv.Open("", "") // no shared KV
 	c := NewFeedCache(disabled, 0, nil)
 
 	const url = "https://feeds.example.com/x.xml"
