@@ -206,57 +206,17 @@ function htmlVariantPlugin(): Plugin {
   };
 }
 
-function youtubeLivePlugin(): Plugin {
-  return {
-    name: 'youtube-live',
-    configureServer(server) {
-      server.middlewares.use(async (req, res, next) => {
-        if (!req.url?.startsWith('/api/youtube/live')) {
-          return next();
-        }
-
-        const url = new URL(req.url, 'http://localhost');
-        const channel = url.searchParams.get('channel');
-
-        if (!channel) {
-          res.statusCode = 400;
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ error: 'Missing channel parameter' }));
-          return;
-        }
-
-        try {
-          // Use YouTube's oEmbed to check if a video is valid/live
-          // For now, return null to use fallback - will implement proper detection later
-          res.setHeader('Content-Type', 'application/json');
-          res.setHeader('Cache-Control', 'public, max-age=300');
-          res.end(JSON.stringify({ videoId: null, channel }));
-        } catch (error) {
-          console.error(`[YouTube Live] Error:`, error);
-          res.statusCode = 500;
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify({ error: 'Failed to fetch', videoId: null }));
-        }
-      });
-    },
-  };
-}
-
 export default defineConfig({
   define: {
-    // THE released version comes from .hanzo/workflows/release.yml, which computes
-    // it monotonically over the 2.4.x line from git tags + already-pushed image
-    // tags — it never reads package.json and never writes it back. So package.json
-    // is a *dev* fallback, not the release: main says 2.4.59 while the image cut
-    // from that very commit is 2.4.60. __APP_VERSION__ keys the chunk-reload guard
-    // (src/main.ts), i.e. it is how a browser notices a deploy and drops its stale
-    // chunk cache — pin it to package.json and N consecutive releases share one key
-    // and the guard silently stops firing. The builder passes the number it cut.
+    // The released version is the one the builder cuts (hanzo.yml passes it as
+    // APP_VERSION); package.json is only the local-dev fallback. __APP_VERSION__
+    // keys the chunk-reload guard (src/main.ts), i.e. it is how a browser notices a
+    // deploy and drops its stale chunk cache — pin it to package.json and N
+    // consecutive releases share one key and the guard silently stops firing.
     __APP_VERSION__: JSON.stringify(process.env.APP_VERSION || pkg.version),
   },
   plugins: [
     htmlVariantPlugin(),
-    youtubeLivePlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: false,
@@ -318,10 +278,6 @@ export default defineConfig({
           },
           {
             urlPattern: /^https?:\/\/.*\/\.well-known\//i,
-            handler: 'NetworkOnly',
-          },
-          {
-            urlPattern: /^https?:\/\/.*\/api\/.*/i,
             handler: 'NetworkOnly',
           },
           {
@@ -474,80 +430,6 @@ export default defineConfig({
       '/v1': {
         target: process.env.VITE_DEV_API_PROXY || 'https://world.hanzo.ai',
         changeOrigin: true,
-      },
-      // Yahoo Finance API
-      '/api/yahoo': {
-        target: 'https://query1.finance.yahoo.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/yahoo/, ''),
-      },
-      // CoinGecko API
-      '/api/coingecko': {
-        target: 'https://api.coingecko.com',
-        changeOrigin: true,
-        rewrite: (path) => {
-          const idx = path.indexOf('?');
-          const qs = idx >= 0 ? path.substring(idx) : '';
-          const params = new URLSearchParams(qs);
-          if (params.get('endpoint') === 'markets') {
-            params.delete('endpoint');
-            const vs = params.get('vs_currencies') || 'usd';
-            params.delete('vs_currencies');
-            params.set('vs_currency', vs);
-            params.set('sparkline', 'true');
-            params.set('order', 'market_cap_desc');
-            return `/api/v3/coins/markets?${params.toString()}`;
-          }
-          return `/api/v3/simple/price${qs}`;
-        },
-      },
-      // Polymarket API — proxy through production Vercel edge function
-      // Direct gamma-api.polymarket.com is blocked by Cloudflare JA3 fingerprinting
-      '/api/polymarket': {
-        target: 'https://world.hanzo.ai',
-        changeOrigin: true,
-        configure: (proxy) => {
-          proxy.on('error', (err) => {
-            console.log('Polymarket proxy error:', err.message);
-          });
-        },
-      },
-      // USGS Earthquake API
-      '/api/earthquake': {
-        target: 'https://earthquake.usgs.gov',
-        changeOrigin: true,
-        timeout: 30000,
-        rewrite: (path) => path.replace(/^\/api\/earthquake/, ''),
-        configure: (proxy) => {
-          proxy.on('error', (err) => {
-            console.log('Earthquake proxy error:', err.message);
-          });
-        },
-      },
-      // PizzINT - Pentagon Pizza Index
-      '/api/pizzint': {
-        target: 'https://www.pizzint.watch',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/pizzint/, '/api'),
-        configure: (proxy) => {
-          proxy.on('error', (err) => {
-            console.log('PizzINT proxy error:', err.message);
-          });
-        },
-      },
-      // FRED Economic Data - handled by Vercel serverless function in prod
-      // In dev, we proxy to the API directly with the key from .env
-      '/api/fred-data': {
-        target: 'https://api.stlouisfed.org',
-        changeOrigin: true,
-        rewrite: (path) => {
-          const url = new URL(path, 'http://localhost');
-          const seriesId = url.searchParams.get('series_id');
-          const start = url.searchParams.get('observation_start');
-          const end = url.searchParams.get('observation_end');
-          const apiKey = process.env.FRED_API_KEY || '';
-          return `/fred/series/observations?series_id=${seriesId}&api_key=${apiKey}&file_type=json&sort_order=desc&limit=10${start ? `&observation_start=${start}` : ''}${end ? `&observation_end=${end}` : ''}`;
-        },
       },
       // RSS Feeds - BBC
       '/rss/bbc': {
@@ -814,78 +696,12 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/rss\/reuters/, ''),
       },
-      // Cloudflare Radar - Internet outages
-      '/api/cloudflare-radar': {
-        target: 'https://api.cloudflare.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/cloudflare-radar/, ''),
-      },
-      // NGA Maritime Safety Information - Navigation Warnings
-      '/api/nga-msi': {
-        target: 'https://msi.nga.mil',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/nga-msi/, ''),
-      },
-      // ACLED - Armed Conflict Location & Event Data (protests, riots)
-      '/api/acled': {
-        target: 'https://acleddata.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/acled/, ''),
-      },
-      // GDELT GEO 2.0 API - Geolocation endpoint (must come before /api/gdelt)
-      '/api/gdelt-geo': {
-        target: 'https://api.gdeltproject.org',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/gdelt-geo/, '/api/v2/geo/geo'),
-      },
-      // GDELT GEO 2.0 API - Global event data
-      '/api/gdelt': {
-        target: 'https://api.gdeltproject.org',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/gdelt/, ''),
-      },
       // AISStream WebSocket proxy for live vessel tracking
       '/ws/aisstream': {
         target: 'wss://stream.aisstream.io',
         changeOrigin: true,
         ws: true,
         rewrite: (path) => path.replace(/^\/ws\/aisstream/, ''),
-      },
-      // FAA NASSTATUS - Airport delays and closures
-      '/api/faa': {
-        target: 'https://nasstatus.faa.gov',
-        changeOrigin: true,
-        secure: true,
-        rewrite: (path) => path.replace(/^\/api\/faa/, ''),
-        configure: (proxy) => {
-          proxy.on('error', (err) => {
-            console.log('FAA NASSTATUS proxy error:', err.message);
-          });
-        },
-      },
-      // OpenSky Network - Aircraft tracking (military flight detection)
-      '/api/opensky': {
-        target: 'https://opensky-network.org/api',
-        changeOrigin: true,
-        secure: true,
-        rewrite: (path) => path.replace(/^\/api\/opensky/, ''),
-        configure: (proxy) => {
-          proxy.on('error', (err) => {
-            console.log('OpenSky proxy error:', err.message);
-          });
-        },
-      },
-      // ADS-B Exchange - Military aircraft tracking (backup/supplement)
-      '/api/adsb-exchange': {
-        target: 'https://adsbexchange.com/api',
-        changeOrigin: true,
-        secure: true,
-        rewrite: (path) => path.replace(/^\/api\/adsb-exchange/, ''),
-        configure: (proxy) => {
-          proxy.on('error', (err) => {
-            console.log('ADS-B Exchange proxy error:', err.message);
-          });
-        },
       },
     },
   },
