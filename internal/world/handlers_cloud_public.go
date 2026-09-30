@@ -59,9 +59,10 @@ func (s *Server) handleCloudModels(w http.ResponseWriter, r *http.Request) {
 					Provider string `json:"provider"`
 					Tier     string `json:"tier"`
 					Context  int64  `json:"context"`
-					Pricing  struct {
-						Input  float64 `json:"input"`
-						Output float64 `json:"output"`
+					// USD per 1M tokens; the listing's `prompt`/`completion` are per token.
+					Pricing struct {
+						Input  float64 `json:"input_per_million"`
+						Output float64 `json:"output_per_million"`
 					} `json:"pricing"`
 				} `json:"data"`
 			}
