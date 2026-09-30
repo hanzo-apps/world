@@ -105,7 +105,7 @@ func TestCloudPulseServiceVolume(t *testing.T) {
 		}`))
 	})
 	// Real uptime source (Gatus): 3 of 4 endpoints healthy → 75%.
-	upstream.HandleFunc("/api/v1/endpoints/statuses", func(w http.ResponseWriter, _ *http.Request) {
+	upstream.HandleFunc("/v1/status/endpoints/statuses", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(gatusBoard3of4))
 	})
 	up := httptest.NewServer(upstream)
