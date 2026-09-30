@@ -10,6 +10,9 @@ images:
     context: .
     dockerfile: Dockerfile
     repo: ghcr.io/hanzoai/world
+    # One architecture on purpose: the build reads KMS secrets, which only a
+    # buildx runner can (the door mounts none), and one runner is one arch.
+    platforms: [linux/amd64]
     # Publishable Mapbox token (pk, URL-restricted to world.hanzo.ai) baked into
     # the Vite SPA at build so the Satellite/Terrain basemaps load (Dark stays
     # keyless CartoDB). Sourced from KMS (hanzo/deploy/VITE_MAPBOX_TOKEN,
