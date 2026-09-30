@@ -24,4 +24,8 @@ jobs:
       # runner means one architecture — drop this line once the door can read a
       # build secret.
       mode: buildx
-    secrets: inherit
+    # `inherit` hands nothing to a reusable workflow in another org, so the pair
+    # the build reads KMS with is passed by name.
+    secrets:
+      KMS_CLIENT_ID: ${{ secrets.KMS_CLIENT_ID }}
+      KMS_CLIENT_SECRET: ${{ secrets.KMS_CLIENT_SECRET }}
