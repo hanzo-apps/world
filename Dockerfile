@@ -1,12 +1,10 @@
-# world.hanzo.ai — Vite SPA + same-origin /api/* data backend, one Go binary.
+# world.hanzo.ai — Vite SPA + same-origin /v1/world/* data backend, one Go binary.
 #
-# The SPA fetches SAME-ORIGIN /api/* (runtime.ts resolves to the current origin),
-# so world.hanzo.ai (and every *.hanzo.app fork) must serve /api/* itself. The
-# old static-only image (hanzoai/static) had no /api, so every data + live-video
-# request fell through to the SPA index.html — the app showed no data and no
-# video. This image fixes that: cmd/world serves BOTH the static build (with SPA
-# fallback for client routes) AND the ~48 /api/* endpoints (internal/world),
-# each a faithful Go port of the original edge function.
+# The SPA fetches SAME-ORIGIN /v1/world/* (runtime.ts resolves to the current
+# origin), so world.hanzo.ai (and every *.hanzo.app fork) serves it itself:
+# cmd/world serves BOTH the static build (with SPA fallback for client routes)
+# AND the /v1/world/* endpoints (internal/world). Any other /v1 or /api path is
+# a 404, never the SPA shell.
 #
 # Built on Hanzo's own hardware (platform.hanzo.ai -> arcd / in-cluster
 # BuildKit), never on GitHub builders.
@@ -65,8 +63,8 @@ RUN case "$PUBLISHABLE_KEY" in \
       *)    echo "PUBLISHABLE_KEY is not a publishable key (expected a pk- prefix)" >&2; exit 1 ;; \
     esac
 # The version the builder is CUTTING, so the bundle self-reports the tag it ships
-# under. release.yml is the one place a release number is decided; package.json is
-# only the local-dev fallback (see the __APP_VERSION__ note in vite.config.ts).
+# under. hanzo.yml passes it; package.json is only the local-dev fallback (see
+# the __APP_VERSION__ note in vite.config.ts).
 ARG APP_VERSION
 ENV APP_VERSION=$APP_VERSION
 RUN pnpm build

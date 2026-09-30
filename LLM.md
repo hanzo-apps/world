@@ -1,8 +1,10 @@
 # Hanzo World — agent guide
 
 Vite + TypeScript SPA (`world`). Real-time global-intelligence dashboard
-served at `world.hanzo.ai`, shipped by `hanzo.yml` CI/CD onto the `world`
-operator Service CR. Same-origin data plane under `/v1/world/*`.
+served at `world.hanzo.ai`. Home: github.com/hanzo-apps/world. Same-origin data
+plane under `/v1/world/*`; any other `/v1` or `/api` path is a 404, never the SPA
+shell (`isAPIPath`, cmd/world). The desktop sidecar serves the same `/v1/world/*`
+paths from `api/*.js`.
 
 ## Browser control — prefer the Hanzo MCP extension over Playwright
 
@@ -78,11 +80,12 @@ Order of preference for "look at / poke the UI": Hanzo MCP browser → Playwrigh
 
 ## Release
 
-Bump `package.json` PATCH (x.y.z → x.y.z+1, never a lazy major), tag `v<version>`,
-`workflow_dispatch` the `cicd` workflow. The image tag is the version WITHOUT the
-`v`. CI's "Deploy" step can false-negative while the operator finishes rolling —
-verify the live version, not just the CI square. Test/doc-only changes need no
-release (the image is byte-identical).
+Bump `package.json` PATCH (x.y.z → x.y.z+1, never a lazy major) and push tag
+`v<version>`; `.github/workflows/cicd.yml` (hanzoai/ci, buildx on `linux-amd64`)
+builds `ghcr.io/hanzoai/world:<version>` with the KMS `build_secrets` from
+hanzo.yml. CI never deploys: pin `tag` + `digest` in universe
+`charts/app/values/hanzo/world.yaml` and cd.hanzo.ai rolls it. Test/doc-only
+changes need no release.
 
 ## Image
 

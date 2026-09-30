@@ -1,12 +1,9 @@
 # Canonical CI/CD config for hanzoai/world — read by both the hanzoai/ci
 # reusable workflow (.github/workflows/cicd.yml) and platform.hanzo.ai.
-# One image (the Vite SPA served by hanzoai/static), and a main-branch rollout
-# onto the existing `world` operator Service CR
-# (universe: infra/k8s/operator/crs/world.yaml).
+# One image: the Go binary serving the Vite SPA and /v1/world/*.
 #
-# No separate `test:` block: the Dockerfile IS the gate — `npm ci && npm run
-# build` fails the image on any type error or build break, so nothing broken
-# ships (same pattern as hanzoai/finance + hanzoai/console).
+# `pnpm build` in the Dockerfile fails the image on any type error; `test:`
+# runs the server and the retired-prefix gates before it is built.
 
 images:
   - name: world
@@ -22,16 +19,25 @@ images:
       # Publishable ingest key (hanzo/deploy/PUBLISHABLE_KEY, env=prod). Without it
       # every logged-out pageview and error is refused 401 at the door.
       - PUBLISHABLE_KEY
+    # The version this build cuts, so the bundle reports the tag it ships under
+    # (__APP_VERSION__ keys the chunk-reload guard in src/main.ts).
+    args:
+      APP_VERSION: ${VERSION}
+
+test:
+  - name: go
+    run: |
+      set -e
+      export GOWORK=off
+      go vet ./...
+      go test -tags sqlite_fts5 -count=1 ./...
+  - name: api-prefix
+    run: node --test tests/no-api-prefix.test.mjs src-tauri/sidecar/local-api-server.test.mjs
 
 # NO `deploy:` BLOCK, and that is the whole point — cd.hanzo.ai owns rollout.
 #
-# This repo said so already, in release.yml's own header: "ROLLOUT IS NOT HERE.
-# This cuts an image + a git tag. Deploying is a reviewed pin bump in
-# hanzoai/universe, applied by cd.hanzo.ai — the App CR is ArgoCD-managed
-# (selfHeal), so a `kubectl patch` from CI is reverted on the next poll."
-# A `deploy:` block here contradicted that and lost: it failed every run needing
-# a kubeconfig it could not use, and had it succeeded, selfHeal would have
-# reverted it within one poll.
+# Deploying is a reviewed pin bump in hanzoai/universe, applied by
+# cd.hanzo.ai; a `kubectl patch` from CI would be reverted on the next poll.
 #
 # Measured, so nobody has to take it on faith: the `world` Deployment carries
 # `apps.hanzo.ai/installation-id: hanzo-cd`, its Application has
