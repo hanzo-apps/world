@@ -36,7 +36,7 @@ export default async function handler(req) {
   const now = Date.now();
   const cached = await getCachedJson(CACHE_KEY);
   if (isValidResult(cached)) {
-    recordCacheTelemetry('/api/ucdp', 'REDIS-HIT');
+    recordCacheTelemetry('/v1/world/ucdp', 'REDIS-HIT');
     return Response.json(cached, {
       status: 200,
       headers: {
@@ -48,7 +48,7 @@ export default async function handler(req) {
   }
 
   if (isValidResult(fallbackCache.data) && now - fallbackCache.timestamp < CACHE_TTL_MS) {
-    recordCacheTelemetry('/api/ucdp', 'MEMORY-HIT');
+    recordCacheTelemetry('/v1/world/ucdp', 'MEMORY-HIT');
     return Response.json(fallbackCache.data, {
       status: 200,
       headers: {
@@ -118,7 +118,7 @@ export default async function handler(req) {
 
     fallbackCache = { data: result, timestamp: now };
     void setCachedJson(CACHE_KEY, result, CACHE_TTL_SECONDS);
-    recordCacheTelemetry('/api/ucdp', 'MISS');
+    recordCacheTelemetry('/v1/world/ucdp', 'MISS');
 
     return Response.json(result, {
       status: 200,
@@ -130,7 +130,7 @@ export default async function handler(req) {
     });
   } catch (error) {
     if (isValidResult(fallbackCache.data)) {
-      recordCacheTelemetry('/api/ucdp', 'STALE');
+      recordCacheTelemetry('/v1/world/ucdp', 'STALE');
       return Response.json(fallbackCache.data, {
         status: 200,
         headers: {
@@ -141,7 +141,7 @@ export default async function handler(req) {
       });
     }
 
-    recordCacheTelemetry('/api/ucdp', 'ERROR');
+    recordCacheTelemetry('/v1/world/ucdp', 'ERROR');
     return Response.json({ error: `Fetch failed: ${toErrorMessage(error)}`, conflicts: [] }, {
       status: 500,
       headers: { ...cors },

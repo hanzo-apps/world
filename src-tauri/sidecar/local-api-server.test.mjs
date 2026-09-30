@@ -121,7 +121,7 @@ test('returns local error directly when cloudFallback is off (default)', async (
   const { port } = await app.start();
 
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/api/fred-data`);
+    const response = await fetch(`http://127.0.0.1:${port}/v1/world/fred-data`);
     assert.equal(response.status, 500);
     const body = await response.json();
     assert.equal(body.source, 'local-error');
@@ -156,11 +156,11 @@ test('falls back to cloud when cloudFallback is enabled and local handler return
   const { port } = await app.start();
 
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/api/fred-data`);
+    const response = await fetch(`http://127.0.0.1:${port}/v1/world/fred-data`);
     assert.equal(response.status, 200);
     const body = await response.json();
     assert.equal(body.source, 'remote');
-    assert.equal(remote.hits.includes('/api/fred-data'), true);
+    assert.equal(remote.hits.includes('/v1/world/fred-data'), true);
   } finally {
     await app.close();
     await localApi.cleanup();
@@ -190,7 +190,7 @@ test('uses local handler response when local handler succeeds', async () => {
   const { port } = await app.start();
 
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/api/live`);
+    const response = await fetch(`http://127.0.0.1:${port}/v1/world/live`);
     assert.equal(response.status, 200);
     const body = await response.json();
     assert.equal(body.source, 'local-ok');
@@ -215,10 +215,38 @@ test('returns 404 when local route does not exist and cloudFallback is off', asy
   const { port } = await app.start();
 
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/api/not-found`);
+    const response = await fetch(`http://127.0.0.1:${port}/v1/world/not-found`);
     assert.equal(response.status, 404);
     const body = await response.json();
     assert.equal(body.error, 'No local handler for this endpoint');
+    assert.equal(remote.hits.length, 0);
+  } finally {
+    await app.close();
+    await localApi.cleanup();
+    await remote.close();
+  }
+});
+
+test('the retired /api prefix is not a route, even with a handler and cloud fallback', async () => {
+  const remote = await setupRemoteServer();
+  const localApi = await setupApiDir({
+    'fred-data.js': `export default async function handler() {
+      return new Response(JSON.stringify({ source: 'local' }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }`,
+  });
+
+  const app = await createLocalApiServer({
+    port: 0,
+    apiDir: localApi.apiDir,
+    remoteBase: remote.remoteBase,
+    cloudFallback: 'true',
+    logger: { log() {}, warn() {}, error() {} },
+  });
+  const { port } = await app.start();
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/fred-data`);
+    assert.equal(response.status, 404);
     assert.equal(remote.hits.length, 0);
   } finally {
     await app.close();
@@ -253,7 +281,7 @@ test('strips browser origin headers before invoking local handlers', async () =>
   const { port } = await app.start();
 
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/api/origin-check`, {
+    const response = await fetch(`http://127.0.0.1:${port}/v1/world/origin-check`, {
       headers: { Origin: 'https://tauri.localhost' },
     });
     assert.equal(response.status, 200);
@@ -282,7 +310,7 @@ test('strips browser origin headers when proxying to cloud fallback (cloudFallba
   const { port } = await app.start();
 
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/api/no-local-handler`, {
+    const response = await fetch(`http://127.0.0.1:${port}/v1/world/no-local-handler`, {
       headers: { Origin: 'https://tauri.localhost' },
     });
     assert.equal(response.status, 200);
@@ -314,7 +342,7 @@ test('responds to OPTIONS preflight with CORS headers', async () => {
   const { port } = await app.start();
 
   try {
-    const response = await fetch(`http://127.0.0.1:${port}/api/data`, { method: 'OPTIONS' });
+    const response = await fetch(`http://127.0.0.1:${port}/v1/world/data`, { method: 'OPTIONS' });
     assert.equal(response.status, 204);
     assert.equal(response.headers.get('access-control-allow-methods'), 'GET, POST, PUT, DELETE, OPTIONS');
   } finally {
@@ -348,7 +376,7 @@ test('resolves packaged tauri resource layout under _up_/api', async () => {
     assert.equal(app.context.apiDir, localResource.apiDir);
     assert.equal(app.routes.length, 1);
 
-    const response = await fetch(`http://127.0.0.1:${port}/api/live`);
+    const response = await fetch(`http://127.0.0.1:${port}/v1/world/live`);
     assert.equal(response.status, 200);
     const body = await response.json();
     assert.equal(body.source, 'local-up');

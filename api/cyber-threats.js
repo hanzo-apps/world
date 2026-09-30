@@ -934,7 +934,7 @@ export default async function handler(req) {
   const redisCached = await getCachedJson(cacheKey);
   if (redisCached && typeof redisCached === 'object' && Array.isArray(redisCached.data)) {
     setResponseCaches(cacheKey, redisCached);
-    recordCacheTelemetry('/api/cyber-threats', 'REDIS-HIT');
+    recordCacheTelemetry('/v1/world/cyber-threats', 'REDIS-HIT');
     return Response.json(redisCached, {
       status: 200,
       headers: {
@@ -947,7 +947,7 @@ export default async function handler(req) {
 
   const memoryCached = hasFreshResponseCache(cacheKey);
   if (memoryCached && Array.isArray(memoryCached.data)) {
-    recordCacheTelemetry('/api/cyber-threats', 'MEMORY-HIT');
+    recordCacheTelemetry('/v1/world/cyber-threats', 'MEMORY-HIT');
     return Response.json(memoryCached, {
       status: 200,
       headers: {
@@ -1025,7 +1025,7 @@ export default async function handler(req) {
 
     setResponseCaches(cacheKey, result);
     void setCachedJson(cacheKey, result, CACHE_TTL_SECONDS);
-    recordCacheTelemetry('/api/cyber-threats', 'MISS');
+    recordCacheTelemetry('/v1/world/cyber-threats', 'MISS');
 
     return Response.json(result, {
       status: 200,
@@ -1038,7 +1038,7 @@ export default async function handler(req) {
   } catch (error) {
     const stale = getStaleResponseCache(cacheKey);
     if (stale && Array.isArray(stale.data)) {
-      recordCacheTelemetry('/api/cyber-threats', 'STALE');
+      recordCacheTelemetry('/v1/world/cyber-threats', 'STALE');
       return Response.json(stale, {
         status: 200,
         headers: {
@@ -1049,7 +1049,7 @@ export default async function handler(req) {
       });
     }
 
-    recordCacheTelemetry('/api/cyber-threats', 'ERROR');
+    recordCacheTelemetry('/v1/world/cyber-threats', 'ERROR');
     return Response.json({
       error: `Fetch failed: ${toErrorMessage(error)}`,
       data: [],

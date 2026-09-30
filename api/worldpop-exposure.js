@@ -59,7 +59,7 @@ function isValidCountries(data) {
 async function handleCountries(corsHeaders, now) {
   const cached = await getCachedJson(COUNTRIES_CACHE_KEY);
   if (isValidCountries(cached)) {
-    recordCacheTelemetry('/api/worldpop-exposure?countries', 'REDIS-HIT');
+    recordCacheTelemetry('/v1/world/worldpop-exposure?countries', 'REDIS-HIT');
     return Response.json(cached, {
       status: 200,
       headers: { ...corsHeaders, 'Cache-Control': 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=3600', 'X-Cache': 'REDIS-HIT' },
@@ -67,7 +67,7 @@ async function handleCountries(corsHeaders, now) {
   }
 
   if (isValidCountries(countriesFallback.data) && now - countriesFallback.timestamp < COUNTRIES_TTL_MS) {
-    recordCacheTelemetry('/api/worldpop-exposure?countries', 'MEMORY-HIT');
+    recordCacheTelemetry('/v1/world/worldpop-exposure?countries', 'MEMORY-HIT');
     return Response.json(countriesFallback.data, {
       status: 200,
       headers: { ...corsHeaders, 'Cache-Control': 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=3600', 'X-Cache': 'MEMORY-HIT' },
@@ -84,7 +84,7 @@ async function handleCountries(corsHeaders, now) {
   const result = { success: true, countries, cached_at: new Date().toISOString() };
   countriesFallback = { data: result, timestamp: now };
   void setCachedJson(COUNTRIES_CACHE_KEY, result, COUNTRIES_TTL_SECONDS);
-  recordCacheTelemetry('/api/worldpop-exposure?countries', 'MISS');
+  recordCacheTelemetry('/v1/world/worldpop-exposure?countries', 'MISS');
 
   return Response.json(result, {
     status: 200,

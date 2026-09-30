@@ -40,8 +40,8 @@ export default function handler(req, res) {
   const title = `${countryName} Intelligence Brief | Hanzo World`;
   const description = `Real-time instability analysis for ${countryName}. Country Instability Index, military posture, threat classification, and prediction markets. Free, open-source geopolitical intelligence.`;
   const imageParams = `c=${countryCode}&t=${type}${score ? `&s=${score}` : ''}${level ? `&l=${level}` : ''}`;
-  const imageUrl = `${baseUrl}/api/og-story?${imageParams}`;
-  const storyUrl = `${baseUrl}/api/story?c=${countryCode}&t=${type}${ts ? `&ts=${ts}` : ''}`;
+  const imageUrl = `${baseUrl}/v1/world/og-story?${imageParams}`;
+  const storyUrl = `${baseUrl}/v1/world/story?c=${countryCode}&t=${type}${ts ? `&ts=${ts}` : ''}`;
 
   const html = `<!DOCTYPE html>
 <html lang="en">

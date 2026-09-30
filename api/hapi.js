@@ -36,7 +36,7 @@ export default async function handler(req) {
   const now = Date.now();
   const cached = await getCachedJson(CACHE_KEY);
   if (isValidResult(cached)) {
-    recordCacheTelemetry('/api/hapi', 'REDIS-HIT');
+    recordCacheTelemetry('/v1/world/hapi', 'REDIS-HIT');
     return Response.json(cached, {
       status: 200,
       headers: {
@@ -48,7 +48,7 @@ export default async function handler(req) {
   }
 
   if (isValidResult(fallbackCache.data) && now - fallbackCache.timestamp < CACHE_TTL_MS) {
-    recordCacheTelemetry('/api/hapi', 'MEMORY-HIT');
+    recordCacheTelemetry('/v1/world/hapi', 'MEMORY-HIT');
     return Response.json(fallbackCache.data, {
       status: 200,
       headers: {
@@ -116,7 +116,7 @@ export default async function handler(req) {
 
     fallbackCache = { data: result, timestamp: now };
     void setCachedJson(CACHE_KEY, result, CACHE_TTL_SECONDS);
-    recordCacheTelemetry('/api/hapi', 'MISS');
+    recordCacheTelemetry('/v1/world/hapi', 'MISS');
 
     return Response.json(result, {
       status: 200,
@@ -128,7 +128,7 @@ export default async function handler(req) {
     });
   } catch (error) {
     if (isValidResult(fallbackCache.data)) {
-      recordCacheTelemetry('/api/hapi', 'STALE');
+      recordCacheTelemetry('/v1/world/hapi', 'STALE');
       return Response.json(fallbackCache.data, {
         status: 200,
         headers: {
@@ -139,7 +139,7 @@ export default async function handler(req) {
       });
     }
 
-    recordCacheTelemetry('/api/hapi', 'ERROR');
+    recordCacheTelemetry('/v1/world/hapi', 'ERROR');
     return Response.json({ error: `Fetch failed: ${toErrorMessage(error)}`, countries: [] }, {
       status: 500,
       headers: { ...cors },

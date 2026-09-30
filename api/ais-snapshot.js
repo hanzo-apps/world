@@ -106,7 +106,7 @@ export default async function handler(req) {
   const redisCached = await getCachedJson(cacheKey);
   if (isValidSnapshot(redisCached)) {
     setMemoryCachedSnapshot(cacheKey, redisCached);
-    recordCacheTelemetry('/api/ais-snapshot', 'REDIS-HIT');
+    recordCacheTelemetry('/v1/world/ais-snapshot', 'REDIS-HIT');
     return new Response(JSON.stringify(redisCached), {
       status: 200,
       headers: {
@@ -120,7 +120,7 @@ export default async function handler(req) {
 
   const memoryCached = getMemoryCachedSnapshot(cacheKey);
   if (isValidSnapshot(memoryCached)) {
-    recordCacheTelemetry('/api/ais-snapshot', 'MEMORY-HIT');
+    recordCacheTelemetry('/v1/world/ais-snapshot', 'MEMORY-HIT');
     return new Response(JSON.stringify(memoryCached), {
       status: 200,
       headers: {
@@ -134,7 +134,7 @@ export default async function handler(req) {
 
   const relayBaseUrl = getRelayBaseUrl();
   if (!relayBaseUrl) {
-    recordCacheTelemetry('/api/ais-snapshot', 'NO-RELAY-CONFIG');
+    recordCacheTelemetry('/v1/world/ais-snapshot', 'NO-RELAY-CONFIG');
     return new Response(JSON.stringify({ vessels: [], skipped: true, reason: 'AIS relay not configured' }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -169,7 +169,7 @@ export default async function handler(req) {
 
     setMemoryCachedSnapshot(cacheKey, data);
     void setCachedJson(cacheKey, data, CACHE_TTL_SECONDS);
-    recordCacheTelemetry('/api/ais-snapshot', 'MISS');
+    recordCacheTelemetry('/v1/world/ais-snapshot', 'MISS');
 
     return new Response(JSON.stringify(data), {
       status: 200,
@@ -183,7 +183,7 @@ export default async function handler(req) {
   } catch (error) {
     const staleMemory = getMemoryCachedSnapshot(cacheKey, true);
     if (isValidSnapshot(staleMemory)) {
-      recordCacheTelemetry('/api/ais-snapshot', 'MEMORY-ERROR-FALLBACK');
+      recordCacheTelemetry('/v1/world/ais-snapshot', 'MEMORY-ERROR-FALLBACK');
       return new Response(JSON.stringify(staleMemory), {
         status: 200,
         headers: {
@@ -195,7 +195,7 @@ export default async function handler(req) {
       });
     }
 
-    recordCacheTelemetry('/api/ais-snapshot', 'ERROR');
+    recordCacheTelemetry('/v1/world/ais-snapshot', 'ERROR');
     return new Response(JSON.stringify({ error: getErrorMessage(error) }), {
       status: 502,
       headers: { 'Content-Type': 'application/json', ...corsHeaders },

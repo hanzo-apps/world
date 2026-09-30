@@ -83,7 +83,7 @@ export default async function handler(req) {
   const now = Date.now();
   const cached = await getCachedJson(CACHE_KEY);
   if (cached && typeof cached === 'object' && Array.isArray(cached.data)) {
-    recordCacheTelemetry('/api/acled', 'REDIS-HIT');
+    recordCacheTelemetry('/v1/world/acled', 'REDIS-HIT');
     return Response.json(cached, {
       status: 200,
       headers: {
@@ -95,7 +95,7 @@ export default async function handler(req) {
   }
 
   if (fallbackCache.data && now - fallbackCache.timestamp < CACHE_TTL_MS) {
-    recordCacheTelemetry('/api/acled', 'MEMORY-HIT');
+    recordCacheTelemetry('/v1/world/acled', 'MEMORY-HIT');
     return Response.json(fallbackCache.data, {
       status: 200,
       headers: {
@@ -165,7 +165,7 @@ export default async function handler(req) {
 
     fallbackCache = { data: result, timestamp: now };
     void setCachedJson(CACHE_KEY, result, CACHE_TTL_SECONDS);
-    recordCacheTelemetry('/api/acled', 'MISS');
+    recordCacheTelemetry('/v1/world/acled', 'MISS');
 
     return Response.json(result, {
       status: 200,
@@ -177,7 +177,7 @@ export default async function handler(req) {
     });
   } catch (error) {
     if (fallbackCache.data) {
-      recordCacheTelemetry('/api/acled', 'STALE');
+      recordCacheTelemetry('/v1/world/acled', 'STALE');
       return Response.json(fallbackCache.data, {
         status: 200,
         headers: {
@@ -188,7 +188,7 @@ export default async function handler(req) {
       });
     }
 
-    recordCacheTelemetry('/api/acled', 'ERROR');
+    recordCacheTelemetry('/v1/world/acled', 'ERROR');
     return Response.json({
       error: `Fetch failed: ${toErrorMessage(error)}`,
       data: [],

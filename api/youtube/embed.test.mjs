@@ -3,7 +3,7 @@ import test from 'node:test';
 import handler from './embed.js';
 
 function makeRequest(query = '') {
-  return new Request(`https://world.hanzo.ai/api/youtube/embed${query}`);
+  return new Request(`https://world.hanzo.ai/v1/world/youtube/embed${query}`);
 }
 
 test('rejects missing or invalid video ids', async () => {

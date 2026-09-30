@@ -98,7 +98,7 @@ export default async function handler(req) {
   const now = Date.now();
   const cached = await getCachedJson(CACHE_KEY);
   if (isValidResult(cached)) {
-    recordCacheTelemetry('/api/climate-anomalies', 'REDIS-HIT');
+    recordCacheTelemetry('/v1/world/climate-anomalies', 'REDIS-HIT');
     return Response.json(cached, {
       status: 200,
       headers: { ...corsHeaders, 'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=600', 'X-Cache': 'REDIS-HIT' },
@@ -106,7 +106,7 @@ export default async function handler(req) {
   }
 
   if (isValidResult(fallbackCache.data) && now - fallbackCache.timestamp < CACHE_TTL_MS) {
-    recordCacheTelemetry('/api/climate-anomalies', 'MEMORY-HIT');
+    recordCacheTelemetry('/v1/world/climate-anomalies', 'MEMORY-HIT');
     return Response.json(fallbackCache.data, {
       status: 200,
       headers: { ...corsHeaders, 'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=600', 'X-Cache': 'MEMORY-HIT' },
@@ -183,7 +183,7 @@ export default async function handler(req) {
 
     fallbackCache = { data: result, timestamp: now };
     void setCachedJson(CACHE_KEY, result, CACHE_TTL_SECONDS);
-    recordCacheTelemetry('/api/climate-anomalies', 'MISS');
+    recordCacheTelemetry('/v1/world/climate-anomalies', 'MISS');
 
     return Response.json(result, {
       status: 200,
@@ -191,14 +191,14 @@ export default async function handler(req) {
     });
   } catch (error) {
     if (isValidResult(fallbackCache.data)) {
-      recordCacheTelemetry('/api/climate-anomalies', 'STALE');
+      recordCacheTelemetry('/v1/world/climate-anomalies', 'STALE');
       return Response.json(fallbackCache.data, {
         status: 200,
         headers: { ...corsHeaders, 'Cache-Control': 'public, max-age=600, s-maxage=600, stale-while-revalidate=120', 'X-Cache': 'STALE' },
       });
     }
 
-    recordCacheTelemetry('/api/climate-anomalies', 'ERROR');
+    recordCacheTelemetry('/v1/world/climate-anomalies', 'ERROR');
     return Response.json({ error: `Fetch failed: ${toErrorMessage(error)}`, anomalies: [] }, {
       status: 500, headers: corsHeaders,
     });

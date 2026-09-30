@@ -11,7 +11,7 @@ const ORIGINAL_URLHAUS_KEY = process.env.URLHAUS_AUTH_KEY;
 const ORIGINAL_OTX_KEY = process.env.OTX_API_KEY;
 const ORIGINAL_ABUSEIPDB_KEY = process.env.ABUSEIPDB_API_KEY;
 
-function makeRequest(path = '/api/cyber-threats', ip = '198.51.100.10') {
+function makeRequest(path = '/v1/world/cyber-threats', ip = '198.51.100.10') {
   const headers = new Headers();
   headers.set('x-forwarded-for', ip);
   return new Request(`https://world.hanzo.ai${path}`, { headers });
@@ -197,7 +197,7 @@ test('API aggregates from all 5 sources', async () => {
     geo: () => jsonResponse({ success: true, latitude: 40.0, longitude: -74.0, country_code: 'US' }),
   });
 
-  const response = await handler(makeRequest('/api/cyber-threats?limit=100&days=14', '198.51.100.20'));
+  const response = await handler(makeRequest('/v1/world/cyber-threats?limit=100&days=14', '198.51.100.20'));
   assert.equal(response.status, 200);
 
   const body = await response.json();
@@ -232,7 +232,7 @@ test('API works with only free sources when keys missing', async () => {
     c2intel: () => textResponse('#ip,ioc\n10.10.10.10,Possible Cobaltstrike C2 IP'),
   });
 
-  const response = await handler(makeRequest('/api/cyber-threats?limit=100&days=14', '198.51.100.11'));
+  const response = await handler(makeRequest('/v1/world/cyber-threats?limit=100&days=14', '198.51.100.11'));
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('X-Cache'), 'MISS');
 
@@ -272,7 +272,7 @@ test('API marks partial=true when URLhaus is enabled but fails', async () => {
     c2intel: () => textResponse('#ip,ioc\n10.10.10.10,Possible Cobaltstrike C2 IP'),
   });
 
-  const response = await handler(makeRequest('/api/cyber-threats?limit=100&days=14', '198.51.100.12'));
+  const response = await handler(makeRequest('/v1/world/cyber-threats?limit=100&days=14', '198.51.100.12'));
   assert.equal(response.status, 200);
 
   const body = await response.json();
@@ -307,7 +307,7 @@ test('API returns memory cache hit on repeated request', async () => {
     c2intel: () => textResponse('#ip,ioc\n10.10.10.10,Possible Cobaltstrike C2 IP'),
   });
 
-  const first = await handler(makeRequest('/api/cyber-threats?limit=100&days=14', '198.51.100.13'));
+  const first = await handler(makeRequest('/v1/world/cyber-threats?limit=100&days=14', '198.51.100.13'));
   assert.equal(first.status, 200);
   assert.equal(first.headers.get('X-Cache'), 'MISS');
   assert.equal(feodoCalls, 1);
@@ -316,7 +316,7 @@ test('API returns memory cache hit on repeated request', async () => {
     throw new Error('network should not be hit for memory cache');
   };
 
-  const second = await handler(makeRequest('/api/cyber-threats?limit=100&days=14', '198.51.100.13'));
+  const second = await handler(makeRequest('/v1/world/cyber-threats?limit=100&days=14', '198.51.100.13'));
   assert.equal(second.status, 200);
   assert.equal(second.headers.get('X-Cache'), 'MEMORY-HIT');
   assert.equal(feodoCalls, 1);
@@ -348,7 +348,7 @@ test('API returns stale fallback when upstream fails after fresh cache TTL', asy
       c2intel: () => textResponse('#ip,ioc\n10.10.10.10,Possible Cobaltstrike C2 IP'),
     });
 
-    const first = await handler(makeRequest('/api/cyber-threats?limit=100&days=14', '198.51.100.14'));
+    const first = await handler(makeRequest('/v1/world/cyber-threats?limit=100&days=14', '198.51.100.14'));
     assert.equal(first.status, 200);
     assert.equal(first.headers.get('X-Cache'), 'MISS');
 
@@ -357,7 +357,7 @@ test('API returns stale fallback when upstream fails after fresh cache TTL', asy
       throw new Error('forced upstream failure');
     };
 
-    const stale = await handler(makeRequest('/api/cyber-threats?limit=100&days=14', '198.51.100.14'));
+    const stale = await handler(makeRequest('/v1/world/cyber-threats?limit=100&days=14', '198.51.100.14'));
     assert.equal(stale.status, 200);
     assert.equal(stale.headers.get('X-Cache'), 'STALE');
 

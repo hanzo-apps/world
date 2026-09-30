@@ -14,6 +14,12 @@ import { pathToFileURL } from 'node:url';
 // fetch() calls in dynamically-loaded handler modules (api/*.js) use IPv4.
 const _originalFetch = globalThis.fetch;
 
+
+// Every route the sidecar serves sits under the same prefix the web app calls
+// (/v1/world/*), so the desktop runtime's fetch patch forwards a path verbatim and
+// the cloud fallback asks world.hanzo.ai for the very same path.
+const ROUTE_PREFIX = '/v1/world';
+
 function normalizeRequestBody(body) {
   if (body == null) return null;
   if (typeof body === 'string' || Buffer.isBuffer(body) || body instanceof Uint8Array) return body;
@@ -115,7 +121,7 @@ function routePriority(routePath) {
 
 function matchRoute(routePath, pathname) {
   const routeParts = splitRoutePath(routePath);
-  const pathParts = splitRoutePath(pathname.replace(/^\/api/, ''));
+  const pathParts = splitRoutePath(pathname);
 
   let i = 0;
   let j = 0;
@@ -225,7 +231,7 @@ async function proxyToCloud(requestUrl, req, remoteBase) {
 }
 
 function pickModule(pathname, routes) {
-  const apiPath = pathname.startsWith('/api') ? pathname.slice(4) || '/' : pathname;
+  const apiPath = pathname.slice(ROUTE_PREFIX.length) || '/';
 
   for (const candidate of routes) {
     if (matchRoute(candidate.routePath, apiPath)) {
@@ -681,12 +687,12 @@ async function dispatch(requestUrl, req, routes, context) {
     return new Response(null, { status: 204, headers: makeCorsHeaders(req) });
   }
 
-  if (requestUrl.pathname === '/api/service-status') {
+  if (requestUrl.pathname === `${ROUTE_PREFIX}/service-status`) {
     return handleLocalServiceStatus(context);
   }
 
   // Localhost-only diagnostics — no token required
-  if (requestUrl.pathname === '/api/local-status') {
+  if (requestUrl.pathname === `${ROUTE_PREFIX}/local-status`) {
     return json({
       success: true,
       mode: context.mode,
@@ -697,14 +703,14 @@ async function dispatch(requestUrl, req, routes, context) {
       routes: routes.length,
     });
   }
-  if (requestUrl.pathname === '/api/local-traffic-log') {
+  if (requestUrl.pathname === `${ROUTE_PREFIX}/local-traffic-log`) {
     if (req.method === 'DELETE') {
       trafficLog.length = 0;
       return json({ cleared: true });
     }
     return json({ entries: [...trafficLog], verboseMode, maxEntries: TRAFFIC_LOG_MAX });
   }
-  if (requestUrl.pathname === '/api/local-debug-toggle') {
+  if (requestUrl.pathname === `${ROUTE_PREFIX}/local-debug-toggle`) {
     if (req.method === 'POST') {
       verboseMode = !verboseMode;
       saveVerboseState();
@@ -722,7 +728,7 @@ async function dispatch(requestUrl, req, routes, context) {
     }
   }
 
-  if (requestUrl.pathname === '/api/local-env-update') {
+  if (requestUrl.pathname === `${ROUTE_PREFIX}/local-env-update`) {
     if (req.method === 'POST') {
       const body = await readBody(req);
       if (body) {
@@ -749,7 +755,7 @@ async function dispatch(requestUrl, req, routes, context) {
     return json({ error: 'POST required' }, 405);
   }
 
-  if (requestUrl.pathname === '/api/local-validate-secret') {
+  if (requestUrl.pathname === `${ROUTE_PREFIX}/local-validate-secret`) {
     if (req.method !== 'POST') {
       return json({ error: 'POST required' }, 405);
     }
@@ -836,17 +842,17 @@ export async function createLocalApiServer(options = {}) {
   const server = createServer(async (req, res) => {
     const requestUrl = new URL(req.url || '/', `http://127.0.0.1:${context.port}`);
 
-    if (!requestUrl.pathname.startsWith('/api/')) {
+    if (!requestUrl.pathname.startsWith(`${ROUTE_PREFIX}/`)) {
       res.writeHead(404, { 'content-type': 'application/json', ...makeCorsHeaders(req) });
       res.end(JSON.stringify({ error: 'Not found' }));
       return;
     }
 
     const start = Date.now();
-    const skipRecord = requestUrl.pathname === '/api/local-traffic-log'
-      || requestUrl.pathname === '/api/local-debug-toggle'
-      || requestUrl.pathname === '/api/local-env-update'
-      || requestUrl.pathname === '/api/local-validate-secret';
+    const skipRecord = requestUrl.pathname === `${ROUTE_PREFIX}/local-traffic-log`
+      || requestUrl.pathname === `${ROUTE_PREFIX}/local-debug-toggle`
+      || requestUrl.pathname === `${ROUTE_PREFIX}/local-env-update`
+      || requestUrl.pathname === `${ROUTE_PREFIX}/local-validate-secret`;
 
     try {
       const response = await dispatch(requestUrl, req, routes, context);

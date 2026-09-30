@@ -7,7 +7,7 @@ function makeRequest(origin) {
   if (origin !== null) {
     headers.set('origin', origin);
   }
-  return new Request('https://world.hanzo.ai/api/test', { headers });
+  return new Request('https://world.hanzo.ai/v1/world/test', { headers });
 }
 
 test('allows desktop Tauri origins', () => {

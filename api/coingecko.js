@@ -72,7 +72,7 @@ export default async function handler(req) {
 
   const redisCached = await getCachedJson(redisKey);
   if (isValidPayload(redisCached)) {
-    recordCacheTelemetry('/api/coingecko', 'REDIS-HIT');
+    recordCacheTelemetry('/v1/world/coingecko', 'REDIS-HIT');
     return new Response(redisCached.body, {
       status: redisCached.status,
       headers: getHeaders(cors, 'REDIS-HIT'),
@@ -84,7 +84,7 @@ export default async function handler(req) {
     fallbackCache.key === cacheKey &&
     now - fallbackCache.timestamp < CACHE_TTL_MS
   ) {
-    recordCacheTelemetry('/api/coingecko', 'MEMORY-HIT');
+    recordCacheTelemetry('/v1/world/coingecko', 'MEMORY-HIT');
     return new Response(fallbackCache.payload.body, {
       status: fallbackCache.payload.status,
       headers: getHeaders(cors, 'MEMORY-HIT'),
@@ -112,7 +112,7 @@ export default async function handler(req) {
       isValidPayload(fallbackCache.payload) &&
       fallbackCache.key === cacheKey
     ) {
-      recordCacheTelemetry('/api/coingecko', 'STALE');
+      recordCacheTelemetry('/v1/world/coingecko', 'STALE');
       return new Response(fallbackCache.payload.body, {
         status: fallbackCache.payload.status,
         headers: getHeaders(cors, 'STALE'),
@@ -126,9 +126,9 @@ export default async function handler(req) {
       const payload = { body: data, status: response.status };
       fallbackCache = { key: cacheKey, payload, timestamp: Date.now() };
       void setCachedJson(redisKey, payload, CACHE_TTL_SECONDS);
-      recordCacheTelemetry('/api/coingecko', 'MISS');
+      recordCacheTelemetry('/v1/world/coingecko', 'MISS');
     } else {
-      recordCacheTelemetry('/api/coingecko', 'UPSTREAM-ERROR');
+      recordCacheTelemetry('/v1/world/coingecko', 'UPSTREAM-ERROR');
     }
 
     return new Response(data, {
@@ -138,14 +138,14 @@ export default async function handler(req) {
   } catch (error) {
     // Return cached data on error if available
     if (isValidPayload(fallbackCache.payload) && fallbackCache.key === cacheKey) {
-      recordCacheTelemetry('/api/coingecko', 'ERROR-FALLBACK');
+      recordCacheTelemetry('/v1/world/coingecko', 'ERROR-FALLBACK');
       return new Response(fallbackCache.payload.body, {
         status: fallbackCache.payload.status,
         headers: getHeaders(cors, 'ERROR-FALLBACK', 'public, max-age=120'),
       });
     }
 
-    recordCacheTelemetry('/api/coingecko', 'ERROR');
+    recordCacheTelemetry('/v1/world/coingecko', 'ERROR');
     return new Response(JSON.stringify({ error: 'Failed to fetch data' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json', ...cors },
