@@ -2,7 +2,7 @@ package world
 
 import "net/http"
 
-// Mount registers every /v1/world/* route on mux. All non-/api routes are handled by
+// Mount registers every /v1/world/* route on mux. Every other path is handled by
 // the static SPA server wired up in cmd/world.
 func (s *Server) Mount(mux *http.ServeMux) {
 	s.mount(mux)

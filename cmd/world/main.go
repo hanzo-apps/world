@@ -6,7 +6,7 @@
 //   - /v1/world/*      → the Go data backend (internal/world), each endpoint a
 //     faithful port of the original edge function.
 //   - everything  → static files from --root, with SPA fallback to index.html
-//     else          for client-routed paths (never for /api or asset misses).
+//     else          for client-routed paths (never for /v1, /api or asset misses).
 //
 // It listens on :3000 (the container/CR port); override with --addr or PORT.
 package main
@@ -56,7 +56,7 @@ func main() {
 	mux := http.NewServeMux()
 	srv.Mount(mux) // /v1/world/* routes
 
-	// Static SPA + fallback handles everything not matched by an /api route.
+	// Static SPA + fallback handles everything not matched by a /v1/world route.
 	// The vanilla Vite build (--root) is the default surface; the React rewrite
 	// (--react-root) is served ONLY to a session that opted in via ?react, sticky
 	// per a first-party cookie — so shipping this changes nothing until we flip
@@ -87,9 +87,9 @@ func main() {
 }
 
 // spaHandler serves files from root and falls back to index.html for any GET
-// that doesn't resolve to a real file (client-side routing). It never serves the
-// SPA shell for /api paths (those are handled by the mux) and returns 404 for
-// missing static assets so a broken asset URL is visible, not masked by HTML.
+// that doesn't resolve to a real file (client-side routing). An API path the mux
+// did not match (/v1/…, and the retired /api/…) is a 404, never the SPA shell, and
+// so is a missing static asset, so a broken URL is visible, not masked by HTML.
 type spaHandler struct {
 	root      string
 	indexHTML []byte
@@ -211,6 +211,10 @@ func (h *spaHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.serveIndex(w, r)
 		return
 	}
+	if isAPIPath(rel) {
+		http.NotFound(w, r)
+		return
+	}
 	info, err := os.Stat(full)
 	switch {
 	case err == nil && !info.IsDir():
@@ -248,6 +252,18 @@ func setCacheHeaders(w http.ResponseWriter, rel string) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-cache")
+}
+
+// isAPIPath reports whether rel (root-relative, no leading slash) is in an API
+// namespace: /v1 is the API, and /api is the prefix it replaced. Neither is a
+// client route, so neither ever falls back to the SPA shell.
+func isAPIPath(rel string) bool {
+	for _, p := range []string{"v1", "api"} {
+		if rel == p || strings.HasPrefix(rel, p+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 // hasExt reports whether the last path segment has a file extension, used to

@@ -211,3 +211,49 @@ func TestCanarySurfaceSelection(t *testing.T) {
 		}
 	})
 }
+
+// TestAPIPathsNeverServeTheShell pins the one-prefix rule: the data plane is
+// /v1/world/*, the retired /api/* prefix answers 404, and neither namespace ever
+// falls through to the SPA shell. A client route still gets the shell.
+func TestAPIPathsNeverServeTheShell(t *testing.T) {
+	root := writeTree(t)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/v1/world/health", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, `{"status":"ok"}`)
+	})
+	mux.Handle("/", gzipStatic(newCanaryHandler(root, writeReactTree(t))))
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	cases := map[string]int{
+		"/v1/world/health":  http.StatusOK,
+		"/country/US":       http.StatusOK,
+		"/api":              http.StatusNotFound,
+		"/api/":             http.StatusNotFound,
+		"/api/rss-proxy":    http.StatusNotFound,
+		"/api/world/health": http.StatusNotFound,
+		"/v1":               http.StatusNotFound,
+		"/v1/nope":          http.StatusNotFound,
+	}
+	// Both surfaces: the default vanilla shell and the opted-in React one.
+	for _, surface := range []string{"", "react"} {
+		for path, want := range cases {
+			req, _ := http.NewRequest(http.MethodGet, srv.URL+path, nil)
+			if surface != "" {
+				req.AddCookie(&http.Cookie{Name: surfaceCookie, Value: surface})
+			}
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("GET %s: %v", path, err)
+			}
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if resp.StatusCode != want {
+				t.Errorf("[%s] GET %s = %d, want %d", surface, path, resp.StatusCode, want)
+			}
+			if want == http.StatusNotFound && strings.Contains(string(body), "<title>world") {
+				t.Errorf("[%s] GET %s served an SPA shell", surface, path)
+			}
+		}
+	}
+}
